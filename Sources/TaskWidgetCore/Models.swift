@@ -1,5 +1,20 @@
 import Foundation
 
+public struct Subtask: Codable, Identifiable, Equatable {
+    public var id: UUID
+    public var title: String
+    public var done: Bool
+    /// "yyyy-MM-dd" 로컬 날짜.
+    public var dueDate: String?
+
+    public init(id: UUID = UUID(), title: String, done: Bool = false, dueDate: String? = nil) {
+        self.id = id
+        self.title = title
+        self.done = done
+        self.dueDate = dueDate
+    }
+}
+
 public struct Todo: Codable, Identifiable, Equatable {
     public var id: UUID
     public var title: String
@@ -11,9 +26,11 @@ public struct Todo: Codable, Identifiable, Equatable {
     public var tagIds: [String]
     /// 여러 줄 메모. 없으면 "".
     public var memo: String
+    public var subtasks: [Subtask]
 
     public init(id: UUID = UUID(), title: String, done: Bool = false, createdAt: Date = Date(),
-                completedAt: Date? = nil, dueDate: String? = nil, tagIds: [String] = [], memo: String = "") {
+                completedAt: Date? = nil, dueDate: String? = nil, tagIds: [String] = [], memo: String = "",
+                subtasks: [Subtask] = []) {
         self.id = id
         self.title = title
         self.done = done
@@ -22,6 +39,7 @@ public struct Todo: Codable, Identifiable, Equatable {
         self.dueDate = dueDate
         self.tagIds = tagIds
         self.memo = memo
+        self.subtasks = subtasks
     }
 
     public init(from decoder: Decoder) throws {
@@ -34,6 +52,19 @@ public struct Todo: Codable, Identifiable, Equatable {
         dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
         tagIds = try c.decodeIfPresent([String].self, forKey: .tagIds) ?? []
         memo = try c.decodeIfPresent(String.self, forKey: .memo) ?? ""
+        subtasks = try c.decodeIfPresent([Subtask].self, forKey: .subtasks) ?? []
+    }
+
+    /// 하위 할 일 진행 (완료 수 / 전체).
+    public var subtaskProgress: (done: Int, total: Int) {
+        (subtasks.filter(\.done).count, subtasks.count)
+    }
+
+    /// 완료 토글. 완료로 바꾸면 하위 할 일도 모두 완료, 되돌릴 땐 하위는 그대로.
+    public mutating func toggleDone(now: Date = Date()) {
+        done.toggle()
+        completedAt = done ? now : nil
+        if done { for i in subtasks.indices { subtasks[i].done = true } }
     }
 
     /// 메모 첫 비어 있지 않은 줄 (미리보기용). 없으면 nil.
