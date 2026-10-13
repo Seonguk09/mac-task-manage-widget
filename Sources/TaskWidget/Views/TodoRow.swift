@@ -5,6 +5,7 @@ struct TodoRow: View {
     let todo: Todo
     @EnvironmentObject var state: AppState
     @Environment(\.fontScale) private var scale
+    @Environment(\.atmAccent) private var accent
     @State private var hovering = false
     @State private var showDue = false
     @State private var showTags = false
@@ -24,7 +25,7 @@ struct TodoRow: View {
             Button { state.toggle(todo) } label: {
                 Image(systemName: todo.done ? "checkmark.square.fill" : "square")
                     .font(.system(size: 13 * scale))
-                    .foregroundStyle(todo.done ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(todo.done ? accent : Color.secondary)
             }
             .buttonStyle(.plain)
 
@@ -68,7 +69,7 @@ struct TodoRow: View {
                     Button { toggleMemo() } label: {
                         Image(systemName: "text.alignleft")
                             .font(.system(size: 11 * scale))
-                            .foregroundStyle(hasMemo || memoOpen ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(hasMemo || memoOpen ? accent : Color.secondary)
                             .frame(width: 14 * scale, height: 16 * scale)
                     }
                     .buttonStyle(.plain)

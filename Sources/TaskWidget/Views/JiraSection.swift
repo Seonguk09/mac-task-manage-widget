@@ -132,11 +132,12 @@ struct JiraStatusPill: View {
     let category: String
     let action: () -> Void
     @Environment(\.fontScale) private var scale
+    @Environment(\.atmAccent) private var accent
     @State private var hover = false
 
     private var tint: Color {
         switch category {
-        case "indeterminate": return .blue
+        case "indeterminate": return accent
         case "done": return .green
         default: return .secondary
         }
@@ -149,7 +150,7 @@ struct JiraStatusPill: View {
                 Image(systemName: "chevron.down").font(.system(size: 8 * scale, weight: .bold))
             }
             .font(.system(size: 10.5 * scale, weight: .medium))
-            .foregroundStyle(category == "indeterminate" ? Color.accentColor : tint)
+            .foregroundStyle(tint)
             .padding(.horizontal, 7).padding(.vertical, 2)
             .background(Capsule().fill(tint.opacity(hover ? 0.26 : 0.16)))
             .overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 0.5))
@@ -170,6 +171,7 @@ struct JiraRow: View {
     enum Trailing { case none, version, status }
     @State fileprivate var showTransitions = false
     @Environment(\.fontScale) private var scale
+    @Environment(\.atmAccent) private var accent
 
     var body: some View {
         HStack(spacing: 6) {
@@ -182,7 +184,7 @@ struct JiraRow: View {
                 Circle().fill(priorityColor).frame(width: 6, height: 6)
                 Text(issue.id)
                     .font(.system(size: 11 * scale, design: .monospaced))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(accent)
                 Text(issue.summary)
                     .font(.system(size: 12 * scale))
                     .lineLimit(1)

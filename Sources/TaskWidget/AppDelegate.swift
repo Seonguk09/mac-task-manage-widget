@@ -29,13 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMainMenu()
         try? Paths.ensureDirectories()
 
-        let host = NSHostingView(rootView: RootView().environmentObject(state))
+        let host = NSHostingView(rootView: RootView().environmentObject(state).themedPanel())
         // 패널 크기는 FloatingPanel 이 직접 관리 (minSize/maxSize). SwiftUI 콘텐츠 크기를 창 제약으로 올리지 않는다.
         host.sizingOptions = []
         panel = FloatingPanel(content: host)
         let updateAccessory = NSTitlebarAccessoryViewController()
         updateAccessory.layoutAttribute = .trailing
-        let updateHost = NSHostingView(rootView: UpdateTitlebarButton().environmentObject(state))
+        let updateHost = NSHostingView(rootView: UpdateTitlebarButton().environmentObject(state).themedPanel())
         updateHost.frame = NSRect(x: 0, y: 0, width: 120, height: 32)
         updateAccessory.view = updateHost
         panel.addTitlebarAccessoryViewController(updateAccessory)
