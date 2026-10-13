@@ -126,6 +126,41 @@ struct JiraTransitionPopover: View {
     }
 }
 
+/// 상태 변경 버튼: 상태 종류(new / indeterminate / done)별 색 알약 + ▾.
+struct JiraStatusPill: View {
+    let status: String
+    let category: String
+    let action: () -> Void
+    @Environment(\.fontScale) private var scale
+    @State private var hover = false
+
+    private var tint: Color {
+        switch category {
+        case "indeterminate": return .blue
+        case "done": return .green
+        default: return .secondary
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Text(status).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 8 * scale, weight: .bold))
+            }
+            .font(.system(size: 10.5 * scale, weight: .medium))
+            .foregroundStyle(category == "indeterminate" ? Color.accentColor : tint)
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(Capsule().fill(tint.opacity(hover ? 0.26 : 0.16)))
+            .overlay(Capsule().stroke(tint.opacity(0.25), lineWidth: 0.5))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .help("상태 변경")
+    }
+}
+
 struct JiraRow: View {
     @EnvironmentObject var state: AppState
     let issue: JiraIssue
@@ -152,16 +187,14 @@ struct JiraRow: View {
                     .font(.system(size: 12 * scale))
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                    .transitionAnchor(anchoredOnSpacer, row: self)
                 switch trailing {
                 case .version:
                     if let tag = JiraVersions.tag(for: issue, prefix: prefix) {
                         Text(tag)
-                            .font(.system(size: 11 * scale, design: .monospaced))
+                            .font(.system(size: 10 * scale, design: .monospaced))
                             .foregroundStyle(Color.primary.opacity(0.78))
-                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Capsule().fill(Color.primary.opacity(0.09)))
-                            .transitionAnchor(true, row: self)
                     }
                 case .status:
                     EmptyView()
@@ -174,30 +207,17 @@ struct JiraRow: View {
         }
         .buttonStyle(.plain)
         .help(issue.summary)
-        if trailing == .status {
-            if state.jiraBusyKeys.contains(issue.id) {
-                ProgressView().controlSize(.mini)
-            } else {
-                Button { showTransitions = true } label: {
-                    Text(issue.status).font(.system(size: 10.5 * scale)).foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("눌러서 상태 변경")
-                .transitionAnchor(true, row: self)
-            }
-        } else if state.jiraBusyKeys.contains(issue.id) {
+        if state.jiraBusyKeys.contains(issue.id) {
             ProgressView().controlSize(.mini)
+        } else {
+            JiraStatusPill(status: issue.status, category: issue.statusCategory) { showTransitions = true }
+                .transitionAnchor(true, row: self)
         }
         }
         .contextMenu {
             Button("상태 변경…") { showTransitions = true }
         }
         Divider()
-    }
-
-    /// 팝오버를 붙일 곳: 오른쪽 상태/버전 라벨. 버전 태그가 없으면 Spacer.
-    fileprivate var anchoredOnSpacer: Bool {
-        trailing == .none || (trailing == .version && JiraVersions.tag(for: issue, prefix: prefix) == nil)
     }
 
     private var priorityColor: Color {
