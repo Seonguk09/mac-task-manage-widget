@@ -29,6 +29,7 @@ public enum SettingsKey {
     public static let jiraGroupByVersion = "jiraGroupByVersion"
     public static let sortTodosByTag = "sortTodosByTag"
     public static let globalHotKeyEnabled = "globalHotKeyEnabled"
+    public static let globalHotKey = "globalHotKey"
     public static let secretStorage = "secretStorage"
 }
 
@@ -74,6 +75,15 @@ public final class Settings {
     public var globalHotKeyEnabled: Bool {
         get { bool(SettingsKey.globalHotKeyEnabled, true) }
         set { d.set(newValue, forKey: SettingsKey.globalHotKeyEnabled) }
+    }
+    /// 저장값이 없거나 깨졌거나 유효하지 않으면 기본값.
+    public var globalHotKey: HotKeySpec {
+        get {
+            guard let data = d.data(forKey: SettingsKey.globalHotKey),
+                  let s = try? JSONDecoder().decode(HotKeySpec.self, from: data), s.isValid else { return .default }
+            return s
+        }
+        set { d.set(try? JSONEncoder().encode(newValue), forKey: SettingsKey.globalHotKey) }
     }
     public var jiraBaseURL: String {
         get { string(SettingsKey.jiraBaseURL, Self.defaultJiraBaseURL) }
