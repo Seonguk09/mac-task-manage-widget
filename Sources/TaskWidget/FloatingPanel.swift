@@ -38,6 +38,13 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         level = s.alwaysOnTop ? .floating : .normal
         collectionBehavior = s.allSpaces ? [.canJoinAllSpaces, .fullScreenAuxiliary] : [.moveToActiveSpace]
         alphaValue = (hovering && s.hoverOpaque) ? 1.0 : s.opacity
+        if let c = s.themeColors, let bg = HexColor.rgb(c.background) {
+            // 테마 색: 배경에 맞춰 라이트/다크 외형을 강제해 글자색이 읽히게 한다.
+            backgroundColor = NSColor(srgbRed: bg.r, green: bg.g, blue: bg.b, alpha: 1)
+            appearance = NSAppearance(named: c.isDark ? .darkAqua : .aqua)
+            return
+        }
+        backgroundColor = .windowBackgroundColor
         switch s.theme {
         case "light": appearance = NSAppearance(named: .aqua)
         case "dark": appearance = NSAppearance(named: .darkAqua)

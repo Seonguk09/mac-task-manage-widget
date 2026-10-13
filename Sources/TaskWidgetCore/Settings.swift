@@ -4,6 +4,9 @@ public enum SettingsKey {
     public static let opacity = "opacity"
     public static let hoverOpaque = "hoverOpaque"
     public static let theme = "theme"
+    public static let themePreset = "themePreset"
+    public static let customBackground = "customBackground"
+    public static let customAccent = "customAccent"
     public static let fontScale = "fontScale"
     public static let alwaysOnTop = "alwaysOnTop"
     public static let allSpaces = "allSpaces"
@@ -59,6 +62,22 @@ public final class Settings {
     public var theme: String {
         get { string(SettingsKey.theme, "system") }
         set { d.set(newValue, forKey: SettingsKey.theme) }
+    }
+    public var themePreset: String {
+        get { string(SettingsKey.themePreset, "default") }
+        set { d.set(newValue, forKey: SettingsKey.themePreset) }
+    }
+    public var customBackground: String {
+        get { string(SettingsKey.customBackground, ThemePalette.defaultBackground) }
+        set { d.set(newValue, forKey: SettingsKey.customBackground) }
+    }
+    public var customAccent: String {
+        get { string(SettingsKey.customAccent, ThemePalette.defaultAccent) }
+        set { d.set(newValue, forKey: SettingsKey.customAccent) }
+    }
+    /// 패널에 적용할 색. nil = 기본(시스템 동작).
+    public var themeColors: ThemeColors? {
+        ThemePalette.resolve(id: themePreset, customBackground: customBackground, customAccent: customAccent)
     }
     public var fontScale: Double {
         get { double(SettingsKey.fontScale, 1.0) }

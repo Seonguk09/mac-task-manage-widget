@@ -39,6 +39,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.opacity) private var opacity = 1.0
     @AppStorage(SettingsKey.hoverOpaque) private var hoverOpaque = true
     @AppStorage(SettingsKey.theme) private var theme = "system"
+    @AppStorage(SettingsKey.themePreset) private var themePreset = "default"
     @AppStorage(SettingsKey.fontScale) private var fontScale = 1.0
     @AppStorage(SettingsKey.alwaysOnTop) private var alwaysOnTop = true
     @AppStorage(SettingsKey.allSpaces) private var allSpaces = true
@@ -153,6 +154,9 @@ struct SettingsView: View {
             }
             Toggle("마우스 올리면 불투명", isOn: $hoverOpaque)
         }
+        Section("테마 색") {
+            ThemeColorPicker()
+        }
         Section {
             Picker("테마", selection: $theme) {
                 Text("시스템").tag("system")
@@ -160,6 +164,10 @@ struct SettingsView: View {
                 Text("다크").tag("dark")
             }
             .pickerStyle(.segmented)
+            .disabled(themePreset != "default")
+            if themePreset != "default" {
+                Text("테마 색을 쓰면 밝기는 배경에 맞춰 자동").font(.caption).foregroundStyle(.secondary)
+            }
             Picker("글자 크기", selection: $fontScale) {
                 Text("작게").tag(0.9)
                 Text("보통").tag(1.0)

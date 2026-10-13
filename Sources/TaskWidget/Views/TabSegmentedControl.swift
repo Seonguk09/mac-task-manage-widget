@@ -6,6 +6,8 @@ import SwiftUI
 struct TabSegmentedControl: NSViewRepresentable {
     let items: [(id: String, title: String)]
     @Binding var selection: String
+    @Environment(\.atmThemed) private var themed
+    @Environment(\.atmAccent) private var accent
 
     func makeNSView(context: Context) -> NSSegmentedControl {
         let control = NSSegmentedControl(labels: items.map(\.title), trackingMode: .selectOne,
@@ -24,6 +26,7 @@ struct TabSegmentedControl: NSViewRepresentable {
         for (i, item) in items.enumerated() where control.label(forSegment: i) != item.title {
             control.setLabel(item.title, forSegment: i)
         }
+        control.selectedSegmentBezelColor = themed ? NSColor(accent) : nil
         control.selectedSegment = items.firstIndex { $0.id == selection } ?? 0
     }
 
