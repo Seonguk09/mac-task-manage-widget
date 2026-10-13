@@ -73,6 +73,7 @@ struct TodoRow: View {
 
             Spacer(minLength: 4)
 
+            subtaskPill.opacity(todo.done ? 0.5 : 1)
             tagsArea.opacity(todo.done ? 0.5 : 1)
 
             Button { showDue = true } label: {
@@ -157,17 +158,35 @@ struct TodoRow: View {
     private static let chevronW: CGFloat = 10
     private static let checkW: CGFloat = 14
 
-    /// 접힌 상태 한 줄: "2/4 · 메모 첫 줄". 둘 다 없으면 nil.
-    private var metaLine: String? {
-        var parts: [String] = []
+    /// 접힌 상태 제목 아래 한 줄: 메모 첫 줄. 하위 할 일 개수는 오른쪽 알약(subtaskPill).
+    private var metaLine: String? { todo.memoPreview }
+
+    /// 하위 할 일 진행 알약: 테마 강조색을 옅게, 다 끝나면 강조색으로 채운다. 누르면 펼치기/접기.
+    @ViewBuilder
+    private var subtaskPill: some View {
         let p = todo.subtaskProgress
-        if p.total > 0 { parts.append("\(p.done)/\(p.total)") }
-        if let m = todo.memoPreview { parts.append(m) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        if p.total > 0 {
+            let complete = p.done == p.total
+            Button { toggleExpanded() } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: complete ? "checkmark" : "checklist")
+                        .font(.system(size: 9 * scale, weight: .semibold))
+                    Text("\(p.done)/\(p.total)")
+                        .font(.system(size: 10.5 * scale, weight: .medium))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(complete ? Color.white : accent)
+                .padding(.horizontal, 6).padding(.vertical, 1.5)
+                .background(Capsule().fill(complete ? accent : accent.opacity(0.18)))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("하위 할 일 \(p.done)/\(p.total)")
+        }
     }
 
     private func sectionLabel(_ text: String) -> some View {
-        Text(text).font(.system(size: 11 * scale)).foregroundStyle(.tertiary)
+        Text(text).font(.system(size: 10.5 * scale, weight: .semibold)).foregroundStyle(.secondary)
     }
 
     private var expandedBody: some View {
