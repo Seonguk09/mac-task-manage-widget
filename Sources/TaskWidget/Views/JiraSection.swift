@@ -186,6 +186,7 @@ struct JiraRow: View {
                 Text(issue.summary)
                     .font(.system(size: 12 * scale))
                     .lineLimit(1)
+                    .truncationHelp(issue.summary)
                 Spacer(minLength: 0)
                 switch trailing {
                 case .version:
@@ -206,7 +207,6 @@ struct JiraRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(issue.summary)
         if state.jiraBusyKeys.contains(issue.id) {
             ProgressView().controlSize(.mini)
         } else {

@@ -45,7 +45,7 @@ struct TodoRow: View {
                     .lineLimit(1)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { beginEdit() }
-                    .help("더블클릭하면 수정")
+                    .truncationHelp(todo.title, hint: "더블클릭하면 수정")
             }
             if let preview = todo.memoPreview {
                 Button { toggleMemo() } label: {
