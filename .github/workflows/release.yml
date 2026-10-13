@@ -1,0 +1,30 @@
+name: release
+
+# main 에 VERSION 이 바뀌어 들어오면 v<VERSION> 태그와 GitHub Release 를 만든다.
+# 본문은 CHANGELOG.md 의 해당 버전 섹션.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="$(tr -d '[:space:]' < VERSION)"
+          if git rev-parse -q --verify "refs/tags/v$V" >/dev/null; then
+            echo "v$V already tagged, skip"; exit 0
+          fi
+          NOTES="$(scripts/release-notes.sh "$V")"
+          [ -n "$NOTES" ] || NOTES="업데이트 노트 없음"
+          gh release create "v$V" --target "$GITHUB_SHA" --title "v$V" --notes "$NOTES"
