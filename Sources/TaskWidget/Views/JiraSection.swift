@@ -133,7 +133,7 @@ struct JiraRow: View {
     var prefix = ""
     var trailing: Trailing = .none
     enum Trailing { case none, version, status }
-    @State private var showTransitions = false
+    @State fileprivate var showTransitions = false
     @Environment(\.fontScale) private var scale
 
     var body: some View {
@@ -152,6 +152,7 @@ struct JiraRow: View {
                     .font(.system(size: 12 * scale))
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                    .transitionAnchor(anchoredOnSpacer, row: self)
                 switch trailing {
                 case .version:
                     if let tag = JiraVersions.tag(for: issue, prefix: prefix) {
@@ -160,6 +161,7 @@ struct JiraRow: View {
                             .foregroundStyle(Color.primary.opacity(0.78))
                             .padding(.horizontal, 6).padding(.vertical, 1)
                             .background(Capsule().fill(Color.primary.opacity(0.09)))
+                            .transitionAnchor(true, row: self)
                     }
                 case .status:
                     EmptyView()
@@ -181,18 +183,21 @@ struct JiraRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("눌러서 상태 변경")
+                .transitionAnchor(true, row: self)
             }
         } else if state.jiraBusyKeys.contains(issue.id) {
             ProgressView().controlSize(.mini)
         }
         }
-        .popover(isPresented: $showTransitions, arrowEdge: .bottom) {
-            JiraTransitionPopover(issue: issue) { showTransitions = false }
-        }
         .contextMenu {
             Button("상태 변경…") { showTransitions = true }
         }
         Divider()
+    }
+
+    /// 팝오버를 붙일 곳: 오른쪽 상태/버전 라벨. 버전 태그가 없으면 Spacer.
+    fileprivate var anchoredOnSpacer: Bool {
+        trailing == .none || (trailing == .version && JiraVersions.tag(for: issue, prefix: prefix) == nil)
     }
 
     private var priorityColor: Color {
@@ -265,5 +270,17 @@ struct JiraVersionMenu: View {
         .padding(.horizontal, 7).padding(.vertical, 1)
         .background(Capsule().fill(selected ? Color.primary.opacity(0.14) : .clear))
         .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.5), lineWidth: selected ? 0 : 0.5))
+    }
+}
+
+
+private extension View {
+    /// 상태 변경 팝오버를 이 뷰 왼쪽에 띄운다. `on` 이 false 면 아무것도 안 붙인다.
+    @ViewBuilder func transitionAnchor(_ on: Bool, row: JiraRow) -> some View {
+        if on {
+            popover(isPresented: row.$showTransitions, arrowEdge: .leading) {
+                JiraTransitionPopover(issue: row.issue) { row.showTransitions = false }
+            }
+        } else { self }
     }
 }
