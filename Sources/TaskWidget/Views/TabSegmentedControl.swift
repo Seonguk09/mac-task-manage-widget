@@ -43,3 +43,54 @@ struct TabSegmentedControl: NSViewRepresentable {
         }
     }
 }
+
+/// 패널 탭 바. 테마 색을 쓰면 직접 그린 "옅은 강조" 탭(포커스를 잃어도 색 유지), 기본 테마면 macOS 기본 세그먼트.
+struct PanelTabBar: View {
+    let items: [(id: String, title: String)]
+    @Binding var selection: String
+    @Environment(\.atmThemed) private var themed
+
+    var body: some View {
+        if themed {
+            SoftAccentTabBar(items: items, selection: $selection)
+        } else {
+            TabSegmentedControl(items: items, selection: $selection)
+        }
+    }
+}
+
+/// 선택된 탭에 강조색을 옅게 깔고 글자를 강조색으로. NSSegmentedControl 처럼 비활성 창에서 회색이 되지 않는다.
+private struct SoftAccentTabBar: View {
+    let items: [(id: String, title: String)]
+    @Binding var selection: String
+    @Environment(\.atmAccent) private var accent
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.fontScale) private var scale
+    @State private var hovered: String?
+
+    var body: some View {
+        let dark = scheme == .dark
+        HStack(spacing: 2) {
+            ForEach(items, id: \.id) { item in
+                let on = item.id == selection
+                Button { selection = item.id } label: {
+                    Text(item.title)
+                        .font(.system(size: 12.5 * scale, weight: on ? .medium : .regular))
+                        .foregroundStyle(on ? (dark ? Color.white : accent) : Color.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(on ? accent.opacity(dark ? 0.28 : 0.18)
+                                         : (hovered == item.id ? Color.primary.opacity(0.06) : .clear))
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovered = $0 ? item.id : (hovered == item.id ? nil : hovered) }
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(dark ? 0.06 : 0.05)))
+    }
+}

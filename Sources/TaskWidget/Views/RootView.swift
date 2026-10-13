@@ -14,7 +14,7 @@ struct RootView: View {
         VStack(spacing: 0) {
             if enabled.count > 1 {
                 HStack(spacing: 8) {
-                    TabSegmentedControl(
+                    PanelTabBar(
                         items: allTabs.filter { enabled.contains($0.id) }.map { ($0.id, $0.title) },
                         selection: Binding(get: { current }, set: { tab = $0 })
                     )
