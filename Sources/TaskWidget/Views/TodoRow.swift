@@ -63,21 +63,23 @@ struct TodoRow: View {
 
             Spacer(minLength: 4)
 
+            // 메모 버튼은 자리를 차지하지 않고 태그 왼쪽 빈 공간에 겹쳐 보인다 (끼워 넣으면 태그와 달력 사이가 벌어지거나 줄이 흔들린다).
+            // 메모가 있으면 제목 아래 미리보기 줄이 버튼이고, 없는 줄은 마우스를 올릴 때만 보인다.
             tagsArea.opacity(todo.done ? 0.5 : 1)
-
-            // 메모가 있으면 제목 아래 미리보기 줄이 버튼이다. 없는 줄은 마우스를 올릴 때만 메모 버튼을 보인다.
-            // 자리는 항상 확보하고 보이기만 토글한다 (끼워 넣으면 그 줄의 태그가 옆으로 밀린다).
-            let showMemoButton = !hasMemo && (hovering || memoOpen)
-            Button { toggleMemo() } label: {
-                Image(systemName: "note.text")
-                    .font(.system(size: 11 * scale))
-                    .foregroundStyle(memoOpen ? Color.accentColor : Color.secondary)
-                    .frame(width: 14 * scale)
-            }
-            .buttonStyle(.plain)
-            .help("메모")
-            .opacity(showMemoButton ? 1 : 0)
-            .allowsHitTesting(showMemoButton)
+                .overlay(alignment: .leading) {
+                    let showMemoButton = !hasMemo && (hovering || memoOpen)
+                    Button { toggleMemo() } label: {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 11 * scale))
+                            .foregroundStyle(memoOpen ? Color.accentColor : Color.secondary)
+                            .frame(width: 14 * scale, height: 16 * scale)
+                    }
+                    .buttonStyle(.plain)
+                    .help("메모")
+                    .offset(x: -18 * scale)
+                    .opacity(showMemoButton ? 1 : 0)
+                    .allowsHitTesting(showMemoButton)
+                }
 
             Button { showDue = true } label: {
                 if badge.style == .none {
