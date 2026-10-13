@@ -54,6 +54,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.claudePath) private var claudePath = ""
     @AppStorage(SettingsKey.tshPath) private var tshPath = ""
     @AppStorage(SettingsKey.teleportAutoConnect) private var teleportAutoConnect = true
+    @AppStorage(SettingsKey.teleportCheckSeconds) private var teleportCheckSeconds = 60
     @AppStorage(SettingsKey.enabledTabs) private var enabledTabs = "tasks,summary"
     @AppStorage(SettingsKey.sortTodosByTag) private var sortByTag = true
     @AppStorage(SettingsKey.summaryInstructions) private var summaryInstructions = ""
@@ -260,6 +261,13 @@ struct SettingsView: View {
         }
         Section {
             Toggle("ATM 시작 시 마지막에 켜 둔 DB 자동 연결", isOn: $teleportAutoConnect)
+            Picker("연결 확인 주기", selection: $teleportCheckSeconds) {
+                Text("30초").tag(30)
+                Text("1분").tag(60)
+                Text("2분").tag(120)
+                Text("5분").tag(300)
+            }
+            .pickerStyle(.segmented)
         }
         Section {
             Button("설정 다시 하기") {

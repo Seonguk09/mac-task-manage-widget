@@ -111,6 +111,20 @@ public enum TeleportTsh {
     }
 }
 
+/// 진행 중인 `tsh login` 을 밖에서 중단하기 위한 손잡이.
+public final class LoginCancel: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pid: Int32 = 0
+    private var cancelled = false
+    public init() {}
+    public var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+    fileprivate func attach(pid: Int32) { lock.lock(); self.pid = pid; lock.unlock() }
+    public func cancel() {
+        lock.lock(); cancelled = true; let p = pid; lock.unlock()
+        if p > 0 { kill(p, SIGTERM) }
+    }
+}
+
 /// `tsh login` 을 PTY 안에서 돌리고 프롬프트에 답한다 (Python pexpect 와 같은 순서).
 /// 이미 로그인돼 있으면 프롬프트 없이 EOF → 성공.
 public struct TeleportLogin {
@@ -119,6 +133,8 @@ public struct TeleportLogin {
     public var timeout: TimeInterval
     /// 추가 환경 변수 (예: TELEPORT_HOME — 현재 세션을 건드리지 않고 비밀번호/OTP 만 검증할 때).
     public var extraEnvironment: [String: String] = [:]
+    /// 있으면 `cancel()` 로 진행 중인 로그인을 중단할 수 있다.
+    public var cancel: LoginCancel?
 
     public init(executable: String, arguments: [String], timeout: TimeInterval = 60) {
         self.executable = executable
@@ -190,6 +206,7 @@ public struct TeleportLogin {
             close(master); close(slave)
             return (.failure(TeleportError("tsh 실행 실패: \(error.localizedDescription)")), report(-1))
         }
+        cancel?.attach(pid: p.processIdentifier)
         close(slave)   // 부모 쪽 slave 를 닫아야 자식 종료 시 master 에 EOF 가 온다
 
         var buf = "", all = ""
@@ -205,6 +222,7 @@ public struct TeleportLogin {
                 failure = "시간 초과 (\(Int(timeout))초)" + (last.isEmpty ? "" : " · 마지막 출력: \(last)")
                 break
             }
+            if cancel?.isCancelled == true { failure = "로그인 취소 (너무 오래 걸림)"; break }
             var pfd = pollfd(fd: master, events: Int16(POLLIN), revents: 0)
             let r = poll(&pfd, 1, 200)
             if r < 0 { if errno == EINTR { continue }; break }
