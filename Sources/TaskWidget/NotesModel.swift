@@ -240,6 +240,7 @@ final class NotesModel: ObservableObject {
     func unlockWithTouchID(_ id: UUID) async throws {
         guard let lock = data.lock else { throw NotesError.noLock }
         let ctx = LAContext()
+        ctx.localizedFallbackTitle = "비밀번호 입력"   // 누르면 LAError.userFallback → 비밀번호 팝오버
         guard try await ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "잠긴 메모 열기") else {
             throw NotesError.failed("Touch ID 실패")
         }

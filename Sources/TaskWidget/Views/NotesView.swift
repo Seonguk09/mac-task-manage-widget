@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 import TaskWidgetCore
 
@@ -546,62 +547,83 @@ private struct MemoEditor: View {
     }
 }
 
-/// 잠긴 메모를 펼쳤을 때: 비밀번호 칸이 바로 보이고, Touch ID 를 켰으면 지문 버튼이 옆에 붙는다.
+/// 잠긴 메모를 펼쳤을 때: "열기" 버튼 하나. Touch ID 를 켰으면 바로 지문을 묻고, 꺼져 있거나 취소·실패하면 비밀번호 팝오버.
 private struct LockedPanel: View {
     @ObservedObject var notes: NotesModel
     let memoId: UUID
-    @Environment(\.fontScale) private var scale
-    @Environment(\.atmAccent) private var accent
-    @State private var pw = ""
+    @State private var askPassword = false
     @State private var error = ""
     @State private var busy = false
-    @FocusState private var pwFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                SecureField("비밀번호로 열기", text: $pw)
-                    .textFieldStyle(.plain)
-                    // macOS 의 "Passwords…" 자동완성 말풍선이 목록을 가리지 않게
-                    .textContentType(.oneTimeCode)
-                    .font(.system(size: 12 * scale))
-                    .focused($pwFocused)
-                    .onSubmit { open() }
-                    .padding(.horizontal, 7).padding(.vertical, 4)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(pwFocused ? accent : Color.primary.opacity(0.12), lineWidth: pwFocused ? 1.5 : 0.5))
-                Button { open() } label: { NoteChip(icon: "lock.open.fill", text: "열기") }
-                    .buttonStyle(.plain)
-                    .disabled(busy || pw.isEmpty)
-                if notes.touchIDEnabled && NotesModel.touchIDAvailable {
-                    Button { touchID() } label: { NoteChip(icon: "touchid", text: nil) }
-                        .buttonStyle(.plain)
-                        .disabled(busy)
-                        .help("Touch ID 로 열기")
-                }
+        Button { openTapped() } label: { NoteChip(icon: "lock.open.fill", text: "열기") }
+            .buttonStyle(.plain)
+            .disabled(busy)
+            .popover(isPresented: $askPassword, arrowEdge: .bottom) {
+                UnlockPopover(notes: notes, memoId: memoId, initialError: error) { askPassword = false }
             }
-            if !error.isEmpty {
-                Text(error).font(.system(size: 10.5 * scale)).foregroundStyle(.red)
-            }
-        }
     }
 
-    private func open() {
-        guard !pw.isEmpty else { return }
-        busy = true; error = ""
-        Task {
-            defer { busy = false }
-            do { try await notes.unlock(memoId, password: pw); pw = "" }
-            catch { self.error = error.localizedDescription }
-        }
-    }
-
-    private func touchID() {
-        busy = true; error = ""
+    private func openTapped() {
+        error = ""
+        guard notes.touchIDEnabled && NotesModel.touchIDAvailable else { askPassword = true; return }
+        busy = true
         Task {
             defer { busy = false }
             do { try await notes.unlockWithTouchID(memoId) }
+            catch let e as LAError where e.code == .userFallback || e.code == .userCancel || e.code == .systemCancel {
+                askPassword = true
+            } catch {
+                self.error = error.localizedDescription
+                askPassword = true
+            }
+        }
+    }
+}
+
+/// 잠긴 메모 열기용 비밀번호 팝오버.
+private struct UnlockPopover: View {
+    @ObservedObject var notes: NotesModel
+    let memoId: UUID
+    let done: () -> Void
+    @State private var pw = ""
+    @State private var error: String
+    @State private var busy = false
+    @FocusState private var focused: Bool
+
+    init(notes: NotesModel, memoId: UUID, initialError: String, done: @escaping () -> Void) {
+        self.notes = notes; self.memoId = memoId; self.done = done
+        _error = State(initialValue: initialError)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("비밀번호 입력").font(.headline)
+            SecureField("비밀번호", text: $pw)
+                .textFieldStyle(.roundedBorder)
+                .textContentType(.oneTimeCode)
+                .focused($focused)
+                .onSubmit { submit() }
+            if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
+            HStack {
+                Spacer()
+                Button("취소") { done() }
+                Button("열기") { submit() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(busy || pw.isEmpty)
+            }
+        }
+        .padding(12)
+        .frame(width: 230)
+        .onAppear { DispatchQueue.main.async { focused = true } }
+    }
+
+    private func submit() {
+        guard !busy, !pw.isEmpty else { return }
+        busy = true; error = ""
+        Task {
+            defer { busy = false }
+            do { try await notes.unlock(memoId, password: pw); pw = ""; done() }
             catch { self.error = error.localizedDescription }
         }
     }
