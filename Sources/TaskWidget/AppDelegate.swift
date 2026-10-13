@@ -103,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         state.teleport.shutdown()
+        state.notes.flushPending()
     }
 
     /// ⌘V/⌘C/⌘X/⌘A/⌘Z 는 메인 메뉴의 Edit 항목을 통해서만 동작한다.

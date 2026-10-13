@@ -9,5 +9,6 @@ struct TabDef {
 let allTabs: [TabDef] = [
     TabDef(id: "tasks", title: "할 일"),
     TabDef(id: "summary", title: "요약"),
+    TabDef(id: "notes", title: "노트"),
     TabDef(id: "teleport", title: "Teleport"),
 ]
