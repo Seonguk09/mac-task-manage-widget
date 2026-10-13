@@ -50,7 +50,7 @@ struct TodoRow: View {
             if let preview = todo.memoPreview {
                 Button { toggleMemo() } label: {
                     HStack(spacing: 3) {
-                        Image(systemName: "note.text").font(.system(size: 9 * scale))
+                        Image(systemName: "text.alignleft").font(.system(size: 9 * scale))
                         Text(preview).font(.system(size: 11 * scale)).lineLimit(1)
                     }
                     .foregroundStyle(.secondary)
@@ -63,23 +63,16 @@ struct TodoRow: View {
 
             Spacer(minLength: 4)
 
-            // 메모 버튼은 자리를 차지하지 않고 태그 왼쪽 빈 공간에 겹쳐 보인다 (끼워 넣으면 태그와 달력 사이가 벌어지거나 줄이 흔들린다).
-            // 메모가 있으면 제목 아래 미리보기 줄이 버튼이고, 없는 줄은 마우스를 올릴 때만 보인다.
             tagsArea.opacity(todo.done ? 0.5 : 1)
-                .overlay(alignment: .leading) {
-                    let showMemoButton = !hasMemo && (hovering || memoOpen)
-                    Button { toggleMemo() } label: {
-                        Image(systemName: "note.text")
-                            .font(.system(size: 11 * scale))
-                            .foregroundStyle(memoOpen ? Color.accentColor : Color.secondary)
-                            .frame(width: 14 * scale, height: 16 * scale)
-                    }
-                    .buttonStyle(.plain)
-                    .help("메모")
-                    .offset(x: -18 * scale)
-                    .opacity(showMemoButton ? 1 : 0)
-                    .allowsHitTesting(showMemoButton)
-                }
+
+            // 달력 아이콘 바로 옆에 같은 크기·옅은 색으로 항상 보인다 (메모가 있으면 파랗게). 모든 줄에 같은 자리라 정렬이 흔들리지 않는다.
+            Button { toggleMemo() } label: {
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(hasMemo || memoOpen ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+            }
+            .buttonStyle(.plain)
+            .help(hasMemo ? "메모 보기·편집" : "메모 추가")
 
             Button { showDue = true } label: {
                 if badge.style == .none {
@@ -118,6 +111,8 @@ struct TodoRow: View {
         if memoOpen { memoEditor }
         }
         .contextMenu {
+            Button(hasMemo ? "메모 편집" : "메모 추가") { if !memoOpen { toggleMemo() } }
+            Divider()
             ForEach(state.tagConfig.groups) { group in
                 Menu(group.name) {
                     ForEach(group.tags) { tag in
