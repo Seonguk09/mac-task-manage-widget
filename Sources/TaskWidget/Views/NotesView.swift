@@ -435,7 +435,10 @@ private struct MemoRow: View {
                 .id("\(memo.id)-\(memo.locked)")
                 if memo.locked {
                     HStack(spacing: 6) {
-                        Button("지금 잠그기") { notes.relockAll() }.controlSize(.mini)
+                        Button { notes.relockAll() } label: {
+                            NoteChip(icon: "lock.fill", text: "지금 잠그기")
+                        }
+                        .buttonStyle(.plain)
                         RelockLabel(notes: notes)
                     }
                 }
@@ -514,6 +517,7 @@ private struct MemoEditor: View {
         TextEditor(text: $draft)
             .font(.system(size: 12 * scale))
             .scrollContentBackground(.hidden)
+            .scrollIndicators(.never)   // 흰 스크롤바 띠가 남지 않게
             .focused($focused)
             .onExitCommand { focused = false }
             // ⌘↩ 로 편집을 마친다
@@ -542,40 +546,40 @@ private struct MemoEditor: View {
     }
 }
 
-/// 잠긴 메모를 펼쳤을 때: Touch ID 또는 비밀번호로 연다.
+/// 잠긴 메모를 펼쳤을 때: 비밀번호 칸이 바로 보이고, Touch ID 를 켰으면 지문 버튼이 옆에 붙는다.
 private struct LockedPanel: View {
     @ObservedObject var notes: NotesModel
     let memoId: UUID
     @Environment(\.fontScale) private var scale
-    @State private var reveal = false
+    @Environment(\.atmAccent) private var accent
     @State private var pw = ""
     @State private var error = ""
     @State private var busy = false
     @FocusState private var pwFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("잠긴 메모입니다").font(.system(size: 12 * scale)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
+                SecureField("비밀번호로 열기", text: $pw)
+                    .textFieldStyle(.plain)
+                    // macOS 의 "Passwords…" 자동완성 말풍선이 목록을 가리지 않게
+                    .textContentType(.oneTimeCode)
+                    .font(.system(size: 12 * scale))
+                    .focused($pwFocused)
+                    .onSubmit { open() }
+                    .padding(.horizontal, 7).padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(pwFocused ? accent : Color.primary.opacity(0.12), lineWidth: pwFocused ? 1.5 : 0.5))
+                Button { open() } label: { NoteChip(icon: "lock.open.fill", text: "열기") }
+                    .buttonStyle(.plain)
+                    .disabled(busy || pw.isEmpty)
                 if notes.touchIDEnabled && NotesModel.touchIDAvailable {
-                    Button("Touch ID로 열기") { touchID() }
+                    Button { touchID() } label: { NoteChip(icon: "touchid", text: nil) }
+                        .buttonStyle(.plain)
+                        .disabled(busy)
+                        .help("Touch ID 로 열기")
                 }
-                Button(reveal ? "취소" : "비밀번호") {
-                    reveal.toggle(); pw = ""; error = ""
-                    if reveal { DispatchQueue.main.async { pwFocused = true } }
-                }
-            }
-            .controlSize(.small)
-            .disabled(busy)
-            if reveal {
-                HStack(spacing: 6) {
-                    SecureField("비밀번호", text: $pw)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($pwFocused)
-                        .onSubmit { open() }
-                    Button("열기") { open() }.controlSize(.small).disabled(busy)
-                }
-                .font(.system(size: 12 * scale))
             }
             if !error.isEmpty {
                 Text(error).font(.system(size: 10.5 * scale)).foregroundStyle(.red)
@@ -657,5 +661,28 @@ private struct NotePasswordPopover: View {
                 self.error = error.localizedDescription
             }
         }
+    }
+}
+
+/// 노트 탭의 작은 강조 알약 버튼 모양 (하위 할 일 개수 알약과 같은 톤).
+private struct NoteChip: View {
+    let icon: String
+    let text: String?
+    @Environment(\.fontScale) private var scale
+    @Environment(\.atmAccent) private var accent
+    @Environment(\.isEnabled) private var enabled
+    @State private var hover = false
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: (text == nil ? 12 : 9.5) * scale, weight: .semibold))
+            if let text { Text(text).font(.system(size: 11 * scale, weight: .medium)) }
+        }
+        .foregroundStyle(accent)
+        .padding(.horizontal, text == nil ? 6 : 8).padding(.vertical, 3)
+        .background(Capsule().fill(accent.opacity(hover && enabled ? 0.26 : 0.16)))
+        .opacity(enabled ? 1 : 0.5)
+        .contentShape(Capsule())
+        .onHover { hover = $0 }
     }
 }
