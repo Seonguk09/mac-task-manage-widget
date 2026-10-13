@@ -162,10 +162,38 @@ final class AppState: ObservableObject {
     }
 
     func toggle(_ todo: Todo) {
-        update(todo.id) {
-            $0.done.toggle()
-            $0.completedAt = $0.done ? Date() : nil
+        update(todo.id) { $0.toggleDone() }
+    }
+
+    // MARK: - Subtasks
+
+    /// 행 펼침 상태 (메모리에만).
+    @Published var expandedTodos: Set<UUID> = []
+
+    func toggleExpanded(_ todo: Todo) {
+        if !expandedTodos.insert(todo.id).inserted { expandedTodos.remove(todo.id) }
+    }
+
+    func addSubtask(_ todo: Todo, _ raw: String) {
+        guard let t = Todo.normalizedTitle(raw) else { return }
+        update(todo.id) { $0.subtasks.append(Subtask(title: t)) }
+    }
+
+    private func updateSub(_ todo: Todo, _ sub: Subtask, _ change: (inout Subtask) -> Void) {
+        update(todo.id) { t in
+            guard let i = t.subtasks.firstIndex(where: { $0.id == sub.id }) else { return }
+            change(&t.subtasks[i])
         }
+    }
+
+    func toggleSubtask(_ todo: Todo, _ sub: Subtask) { updateSub(todo, sub) { $0.done.toggle() } }
+    func setSubtaskDue(_ todo: Todo, _ sub: Subtask, _ key: String?) { updateSub(todo, sub) { $0.dueDate = key } }
+    func renameSubtask(_ todo: Todo, _ sub: Subtask, _ raw: String) {
+        guard let t = Todo.normalizedTitle(raw), t != sub.title else { return }
+        updateSub(todo, sub) { $0.title = t }
+    }
+    func deleteSubtask(_ todo: Todo, _ sub: Subtask) {
+        update(todo.id) { $0.subtasks.removeAll { $0.id == sub.id } }
     }
 
     func setDue(_ todo: Todo, _ dayKey: String?) {

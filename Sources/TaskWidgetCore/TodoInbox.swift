@@ -7,14 +7,27 @@ public struct InboxItem: Codable, Equatable {
     public var due: String?
     public var tags: [String]
     public var memo: String?
+    public var subtasks: [String]
     public var createdAt: Date
 
-    public init(title: String, due: String? = nil, tags: [String] = [], memo: String? = nil, createdAt: Date = Date()) {
+    public init(title: String, due: String? = nil, tags: [String] = [], memo: String? = nil,
+                subtasks: [String] = [], createdAt: Date = Date()) {
         self.title = title
         self.due = due
         self.tags = tags
         self.memo = memo
+        self.subtasks = subtasks
         self.createdAt = createdAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title = try c.decode(String.self, forKey: .title)
+        due = try c.decodeIfPresent(String.self, forKey: .due)
+        tags = try c.decode([String].self, forKey: .tags)
+        memo = try c.decodeIfPresent(String.self, forKey: .memo)
+        subtasks = try c.decodeIfPresent([String].self, forKey: .subtasks) ?? []
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
     }
 }
 
@@ -58,17 +71,18 @@ public enum TodoInbox {
                               now: Date = Date()) -> (output: String, code: Int32) {
         func fail(_ msg: String) -> (String, Int32) { (json(["ok": false, "error": msg]), 2) }
         var title = "", due: String?, memo: String?
-        var tags: [String] = []
+        var tags: [String] = [], subs: [String] = []
         var i = 0
         while i < args.count {
             let a = args[i]
-            guard ["--title", "--due", "--tag", "--memo"].contains(a) else { i += 1; continue }
+            guard ["--title", "--due", "--tag", "--memo", "--sub"].contains(a) else { i += 1; continue }
             guard i + 1 < args.count else { return fail("\(a) 값이 없습니다") }
             let v = args[i + 1]
             switch a {
             case "--title": title = v
             case "--due": due = v
             case "--tag": tags.append(v)
+            case "--sub": subs.append(v)
             default: memo = v
             }
             i += 2
@@ -80,8 +94,9 @@ public enum TodoInbox {
         let trimmed = tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let known = trimmed.filter { !unknown.contains($0) }
 
+        let subtasks = subs.compactMap(Todo.normalizedTitle)
         let id = UUID()
-        let item = InboxItem(title: t, due: due, tags: known, memo: m, createdAt: now)
+        let item = InboxItem(title: t, due: due, tags: known, memo: m, subtasks: subtasks, createdAt: now)
         do {
             try FileManager.default.createDirectory(at: inboxDir, withIntermediateDirectories: true)
             try encoder.encode(item).write(to: inboxDir.appendingPathComponent("\(id.uuidString).json"), options: .atomic)
@@ -90,7 +105,7 @@ public enum TodoInbox {
         }
         let dueValue: Any = due ?? NSNull()
         return (json(["ok": true, "id": id.uuidString, "title": t, "due": dueValue,
-                      "tags": known, "unknownTags": unknown]), 0)
+                      "tags": known, "unknownTags": unknown, "subtasks": subtasks]), 0)
     }
 
     private static func json(_ obj: [String: Any]) -> String {
@@ -117,7 +132,8 @@ public enum TodoInbox {
             let id = UUID(uuidString: f.deletingPathExtension().lastPathComponent) ?? UUID()
             todos.append(Todo(id: id, title: title, createdAt: item.createdAt, dueDate: item.due,
                               tagIds: resolve(item.tags, in: config).ids,
-                              memo: item.memo?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
+                              memo: item.memo?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+                              subtasks: item.subtasks.compactMap(Todo.normalizedTitle).map { Subtask(title: $0) }))
             good.append(f)
         }
         guard !todos.isEmpty, (try? apply(todos)) != nil else { return 0 }
