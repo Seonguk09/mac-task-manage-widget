@@ -287,7 +287,7 @@ final class TeleportManager: ObservableObject {
 
     // MARK: - 자동 유지
 
-    /// 주기마다: 켜 둔 터널이 실제로 응답하는지(프로세스 + MySQL 핸드셰이크) 보고, 아니면 (필요하면 재로그인 후) 다시 연결한다.
+    /// 주기마다: 켜 둔 터널이 응답하는지(프로세스 + 포트 리슨) 보고, 아니면 (필요하면 재로그인 후) 다시 연결한다.
     /// 실패해도 포기하지 않고 간격을 늘려(최대 5분) 계속 시도한다.
     private func watchdog() async {
         // 로그인이 너무 오래 걸리면(잠자기 등으로 멈춘 경우) 중단시킨다. 실패로 처리되어 백오프 후 다시 시도한다.
@@ -301,15 +301,7 @@ final class TeleportManager: ObservableObject {
         // 사용자가 연결 중인 터널은 건드리지 않는다.
         let names = config.tunnels.map(\.name).filter { wanted.contains($0) && states[$0] != .connecting }
         let running = Set(names.filter { procs[$0]?.isRunning == true })
-        let ports = config.tunnels.filter { running.contains($0.name) }.map { ($0.name, $0.port) }
-        let healthy = await withTaskGroup(of: (String, Bool).self) { g -> Set<String> in
-            for (n, port) in ports { g.addTask { (n, TeleportTsh.probeMySQL(port: port)) } }
-            var ok = Set<String>()
-            for await (n, h) in g {
-                if h { ok.insert(n) } else { DiagLog.append("teleport watchdog: probe failed \(n) (no MySQL handshake)") }
-            }
-            return ok
-        }
+        let healthy = Set(config.tunnels.filter { running.contains($0.name) && TeleportTsh.isListening(port: $0.port) }.map(\.name))
         for n in healthy { failures[n] = 0; retryAt[n] = nil }
         let p = TeleportWatchdogPolicy.decide(wanted: names, running: running, healthy: healthy,
                                               retryAt: retryAt, loggedIn: loggedIn)

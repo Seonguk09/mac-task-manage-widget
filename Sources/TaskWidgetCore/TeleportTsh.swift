@@ -111,48 +111,6 @@ public enum TeleportTsh {
     }
 }
 
-extension TeleportTsh {
-    /// 터널 뒤의 MySQL 이 실제로 응답하는지: 127.0.0.1:port 에 붙어 서버가 먼저 보내는 핸드셰이크 패킷
-    /// (길이 3 + 순번 1 + 프로토콜 버전 10) 을 `timeout` 안에 받으면 true. 붙기만 하고 말이 없으면 false.
-    public static func probeMySQL(port: Int, timeout: TimeInterval = 3) -> Bool {
-        let fd = socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
-        defer { close(fd) }
-        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = in_port_t(UInt16(truncatingIfNeeded: port)).bigEndian
-        addr.sin_addr = in_addr(s_addr: UInt32(0x7f000001).bigEndian)
-        let deadline = Date().addingTimeInterval(timeout)
-        func wait(_ events: Int16) -> Bool {
-            while true {
-                let ms = Int32(max(0, deadline.timeIntervalSinceNow * 1000))
-                var pfd = pollfd(fd: fd, events: events, revents: 0)
-                let r = poll(&pfd, 1, ms)
-                if r < 0 && errno == EINTR { continue }
-                return r > 0
-            }
-        }
-        let c = withUnsafePointer(to: &addr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
-        }
-        if c != 0 {
-            guard errno == EINPROGRESS, wait(Int16(POLLOUT)) else { return false }
-            var err: Int32 = 0; var len = socklen_t(MemoryLayout<Int32>.size)
-            guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0, err == 0 else { return false }
-        }
-        var got = [UInt8]()
-        var buf = [UInt8](repeating: 0, count: 64)
-        while got.count < 5 {
-            guard wait(Int16(POLLIN)) else { return false }
-            let n = read(fd, &buf, buf.count)
-            if n > 0 { got += buf[0..<n] }
-            else if n == 0 || (errno != EAGAIN && errno != EINTR) { return false }
-        }
-        return got[4] == 10
-    }
-}
-
 /// 진행 중인 `tsh login` 을 밖에서 중단하기 위한 손잡이.
 public final class LoginCancel: @unchecked Sendable {
     private let lock = NSLock()

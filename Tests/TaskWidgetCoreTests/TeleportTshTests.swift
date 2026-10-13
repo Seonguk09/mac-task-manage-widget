@@ -47,47 +47,6 @@ final class TeleportTshTests: XCTestCase {
         close(s)
         XCTAssertFalse(TeleportTsh.isListening(port: port))
     }
-
-    /// 로컬 리스너: 한 번 accept 하면 `greeting` 을 쓰고(있으면) 2초 유지한다.
-    private func listener(greeting: [UInt8]?) -> (fd: Int32, port: Int) {
-        let s = socket(AF_INET, SOCK_STREAM, 0)
-        var a = sockaddr_in()
-        a.sin_family = sa_family_t(AF_INET); a.sin_addr = in_addr(s_addr: UInt32(0x7f000001).bigEndian); a.sin_port = 0
-        _ = withUnsafePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(s, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
-        _ = listen(s, 4)
-        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-        _ = withUnsafeMutablePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(s, $0, &len) } }
-        Thread.detachNewThread {
-            let c = accept(s, nil, nil)
-            guard c >= 0 else { return }
-            if let g = greeting { _ = g.withUnsafeBufferPointer { write(c, $0.baseAddress, $0.count) } }
-            sleep(2); close(c)
-        }
-        return (s, Int(UInt16(bigEndian: a.sin_port)))
-    }
-
-    func testProbeMySQLHealthyWithHandshake() {
-        let l = listener(greeting: [0x0a, 0, 0, 0, 10, 0x38, 0x2e, 0x30, 0])   // 길이, 순번 0, 프로토콜 10, "8.0"
-        defer { close(l.fd) }
-        XCTAssertTrue(TeleportTsh.probeMySQL(port: l.port, timeout: 1))
-    }
-    func testProbeMySQLUnhealthyWhenSilent() {
-        let l = listener(greeting: nil)
-        defer { close(l.fd) }
-        let t = Date()
-        XCTAssertFalse(TeleportTsh.probeMySQL(port: l.port, timeout: 0.5))
-        XCTAssertLessThan(Date().timeIntervalSince(t), 1.5)
-    }
-    func testProbeMySQLUnhealthyOnErrorPacket() {
-        let l = listener(greeting: [0x05, 0, 0, 0, 0xff, 0x01, 0x02])   // ERR 패킷
-        defer { close(l.fd) }
-        XCTAssertFalse(TeleportTsh.probeMySQL(port: l.port, timeout: 1))
-    }
-    func testProbeMySQLUnhealthyWhenClosed() {
-        let l = listener(greeting: nil)
-        close(l.fd)
-        XCTAssertFalse(TeleportTsh.probeMySQL(port: l.port, timeout: 1))
-    }
 }
 
 private func msg(_ r: Result<Void, TeleportError>) -> String? { if case .failure(let e) = r { return e.message }; return nil }
