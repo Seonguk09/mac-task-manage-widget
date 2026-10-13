@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import TaskWidgetCore
 
@@ -38,15 +39,23 @@ final class TeleportManager: ObservableObject {
     private var loginTask: Task<Bool, Never>?
     /// 마지막 로그인에 쓴 OTP 구간. 같은 코드를 두 번 보내지 않는다.
     private static var lastOTPCounter: Int64?
-    /// 사용자가 켜 둔 터널. 프로세스가 예기치 않게 죽어도 유지되고, 사용자가 끄거나 자동 재연결을 포기하면 빠진다.
+    /// 사용자가 켜 둔 터널. 프로세스가 예기치 않게 죽어도 유지되고, 사용자가 끄면 빠진다 (자동 재연결은 포기하지 않는다).
     private var wanted = Set<String>() {
         didSet { UserDefaults.standard.set(wanted.sorted(), forKey: SettingsKey.teleportWanted) }   // 종료(shutdown)는 건드리지 않는다: 다음 실행에서 복원
     }
     /// 지난 실행에서 켜 두었던 터널. 시작 시 한 번 복원한다.
     private var pendingRestore: [String]
     private var failures: [String: Int] = [:]
+    /// 실패한 터널의 다음 시도 시각 (지수 백오프).
+    private var retryAt: [String: Date] = [:]
     private var watchdogBusy = false
     private var timer: Timer?
+    private var timerSeconds = 0
+    /// 진행 중인 tsh 로그인의 시작 시각과 취소 손잡이. 잠자기 등으로 오래 걸리면 watchdog 이 취소한다.
+    private var loginStarted: Date?
+    private var loginCancel: LoginCancel?
+    private static let loginStuckSeconds: TimeInterval = 90
+    private var observers: [NSObjectProtocol] = []
     /// 이 실행 중 터널을 띄웠거나 로그인한 적이 있나. 종료 시 남의 tsh 세션을 건드리지 않기 위한 표식.
     private var touched = false
 
@@ -90,12 +99,39 @@ final class TeleportManager: ObservableObject {
 
     func start() {
         Task { await refreshStatus() }
-        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        scheduleTimer()
+        observers.append(NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                if let self, self.tshPath != nil, self.config.user != "" {
-                    Task { await self.refreshStatus(); await self.watchdog() }
-                }
+                if let self, self.timerSeconds != Settings.shared.teleportCheckSeconds { self.scheduleTimer() }
             }
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.didWake() }
+        })
+    }
+
+    /// 확인 주기(설정)대로 타이머를 (다시) 만든다. 세션 상태 갱신도 같은 타이머를 쓴다.
+    private func scheduleTimer() {
+        timer?.invalidate()
+        timerSeconds = Settings.shared.teleportCheckSeconds
+        timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(timerSeconds), repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+    }
+
+    private func tick() {
+        guard tshPath != nil, config.user != "" else { return }
+        Task { await refreshStatus(); await watchdog() }
+    }
+
+    /// 잠자기에서 깨면 네트워크가 올라올 시간(5초)을 두고 바로 확인한다. 백오프 대기는 건너뛴다.
+    private func didWake() {
+        guard !wanted.isEmpty else { return }
+        DiagLog.append("teleport wake: check in 5s (wanted=\(wanted.sorted().joined(separator: ",")))")
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            retryAt.removeAll()
+            tick()
         }
     }
 
@@ -129,7 +165,11 @@ final class TeleportManager: ObservableObject {
         }
         busy = "로그인 중…"; message = nil
         defer { busy = nil }
-        let login = TeleportLogin(tsh: tsh, proxy: config.proxy, user: config.user)
+        var login = TeleportLogin(tsh: tsh, proxy: config.proxy, user: config.user)
+        let cancel = LoginCancel()
+        login.cancel = cancel
+        loginCancel = cancel; loginStarted = Date()
+        defer { loginCancel = nil; loginStarted = nil }
         let last = Self.lastOTPCounter
         let used = OTPBox()
         let (res, report) = await Task.detached {
@@ -154,7 +194,7 @@ final class TeleportManager: ObservableObject {
 
     /// 사용자가 켠 터널. 이후 watchdog 이 살아 있게 유지한다.
     func connect(_ t: TeleportTunnel) async {
-        wanted.insert(t.name); failures[t.name] = 0
+        wanted.insert(t.name); failures[t.name] = 0; retryAt[t.name] = nil
         await open(t)
     }
 
@@ -247,29 +287,43 @@ final class TeleportManager: ObservableObject {
 
     // MARK: - 자동 유지
 
-    /// 1분마다: 켜 둔 터널이 실제로 응답하는지 보고, 아니면 (필요하면 재로그인 후) 다시 연결한다.
+    /// 주기마다: 켜 둔 터널이 실제로 응답하는지(프로세스 + MySQL 핸드셰이크) 보고, 아니면 (필요하면 재로그인 후) 다시 연결한다.
+    /// 실패해도 포기하지 않고 간격을 늘려(최대 5분) 계속 시도한다.
     private func watchdog() async {
+        // 로그인이 너무 오래 걸리면(잠자기 등으로 멈춘 경우) 중단시킨다. 실패로 처리되어 백오프 후 다시 시도한다.
+        if loginTask != nil, let s = loginStarted, Date().timeIntervalSince(s) > Self.loginStuckSeconds {
+            DiagLog.append("teleport watchdog: login stuck \(Int(Date().timeIntervalSince(s)))s, cancel")
+            loginCancel?.cancel()
+            return
+        }
         guard isConfigured, tshPath != nil, !wanted.isEmpty, !watchdogBusy, loginTask == nil else { return }
         watchdogBusy = true; defer { watchdogBusy = false }
         // 사용자가 연결 중인 터널은 건드리지 않는다.
         let names = config.tunnels.map(\.name).filter { wanted.contains($0) && states[$0] != .connecting }
-        func plan() -> TeleportWatchdogPolicy {
-            .decide(wanted: names,
-                    running: Set(names.filter { procs[$0]?.isRunning == true }),
-                    listening: Set(config.tunnels.filter { names.contains($0.name) && TeleportTsh.isListening(port: $0.port) }.map(\.name)),
-                    failures: failures, loggedIn: loggedIn)
+        let running = Set(names.filter { procs[$0]?.isRunning == true })
+        let ports = config.tunnels.filter { running.contains($0.name) }.map { ($0.name, $0.port) }
+        let healthy = await withTaskGroup(of: (String, Bool).self) { g -> Set<String> in
+            for (n, port) in ports { g.addTask { (n, TeleportTsh.probeMySQL(port: port)) } }
+            var ok = Set<String>()
+            for await (n, h) in g {
+                if h { ok.insert(n) } else { DiagLog.append("teleport watchdog: probe failed \(n) (no MySQL handshake)") }
+            }
+            return ok
         }
-        let p = plan()
+        for n in healthy { failures[n] = 0; retryAt[n] = nil }
+        let p = TeleportWatchdogPolicy.decide(wanted: names, running: running, healthy: healthy,
+                                              retryAt: retryAt, loggedIn: loggedIn)
+        for (n, left) in p.waiting {
+            states[n] = .failed("재연결 대기 · \(TeleportWatchdogPolicy.waitText(left))")
+        }
         if p.relogin {
-            DiagLog.append("teleport watchdog: relogin (wanted=\(names.joined(separator: ",")))")
+            DiagLog.append("teleport watchdog: relogin (wanted=\(p.restart.joined(separator: ",")))")
             if !(await ensureLoggedIn(force: true, kind: "watchdog")) {
                 DiagLog.append("teleport watchdog: relogin failed: \(message ?? "?")")
-                for n in names { fail(n) }
+                for n in p.restart { fail(n) }
                 return
             }
         }
-        // 재로그인했으면 plan 이 이미 모든 켜 둔 터널을 재시작 대상으로 잡았다.
-        p.giveUp.forEach { giveUp($0) }
         if !p.restart.isEmpty { DiagLog.append("teleport watchdog: restart \(p.restart.joined(separator: ","))") }
         for n in p.restart {
             guard wanted.contains(n), let t = config.tunnels.first(where: { $0.name == n }) else { continue }
@@ -278,20 +332,15 @@ final class TeleportManager: ObservableObject {
                 for _ in 0..<20 where procs[n] != nil { try? await Task.sleep(nanoseconds: 100_000_000) }
             }
             await open(t)
-            if states[n] == .connected { failures[n] = 0 } else { fail(n) }
+            if states[n] == .connected { failures[n] = 0; retryAt[n] = nil } else { fail(n) }
         }
     }
 
     private func fail(_ n: String) {
         failures[n, default: 0] += 1
-        if failures[n]! >= TeleportWatchdogPolicy.maxFailures { giveUp(n) }
-    }
-
-    private func giveUp(_ n: String) {
-        DiagLog.append("teleport watchdog: give up \(n) after \(failures[n] ?? 0) failures")
-        wanted.remove(n)
-        stop(n)
-        states[n] = .failed("자동 재연결 \(TeleportWatchdogPolicy.maxFailures)회 실패 · 토글로 다시 시도")
+        let wait = TeleportWatchdogPolicy.backoff(failures: failures[n]!, interval: TimeInterval(Settings.shared.teleportCheckSeconds))
+        retryAt[n] = Date().addingTimeInterval(wait)
+        DiagLog.append("teleport watchdog: \(n) failure #\(failures[n]!), next try in \(Int(wait))s")
     }
 
     /// 터널 종료 + `tsh db logout` 각각 + `tsh logout` (Python 도구와 같은 순서).

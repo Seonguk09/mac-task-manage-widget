@@ -20,6 +20,7 @@ public enum SettingsKey {
     public static let tshPath = "tshPath"
     public static let teleportAutoConnect = "teleportAutoConnect"
     public static let teleportWanted = "teleportWanted"
+    public static let teleportCheckSeconds = "teleportCheckSeconds"
     public static let lastTab = "lastTab"
     public static let enabledTabs = "enabledTabs"
     public static let todoSectionCollapsed = "todoSectionCollapsed"
@@ -138,6 +139,11 @@ public final class Settings {
     public var teleportAutoConnect: Bool {
         get { bool(SettingsKey.teleportAutoConnect, true) }
         set { d.set(newValue, forKey: SettingsKey.teleportAutoConnect) }
+    }
+    /// Teleport 터널 확인 주기(초). 30/60/120/300 중 하나, 기본 60.
+    public var teleportCheckSeconds: Int {
+        get { let v = int(SettingsKey.teleportCheckSeconds, 60); return [30, 60, 120, 300].contains(v) ? v : 60 }
+        set { d.set(newValue, forKey: SettingsKey.teleportCheckSeconds) }
     }
     /// "keychain" (기본) | "file"
     public var secretStorage: String {
