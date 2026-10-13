@@ -65,15 +65,19 @@ struct TodoRow: View {
 
             tagsArea.opacity(todo.done ? 0.5 : 1)
 
-            if hovering || hasMemo || memoOpen {
-                Button { toggleMemo() } label: {
-                    Image(systemName: "note.text")
-                        .font(.system(size: 11 * scale))
-                        .foregroundStyle(hasMemo || memoOpen ? Color.accentColor : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("메모")
+            // 메모가 있으면 제목 아래 미리보기 줄이 버튼이다. 없는 줄은 마우스를 올릴 때만 메모 버튼을 보인다.
+            // 자리는 항상 확보하고 보이기만 토글한다 (끼워 넣으면 그 줄의 태그가 옆으로 밀린다).
+            let showMemoButton = !hasMemo && (hovering || memoOpen)
+            Button { toggleMemo() } label: {
+                Image(systemName: "note.text")
+                    .font(.system(size: 11 * scale))
+                    .foregroundStyle(memoOpen ? Color.accentColor : Color.secondary)
+                    .frame(width: 14 * scale)
             }
+            .buttonStyle(.plain)
+            .help("메모")
+            .opacity(showMemoButton ? 1 : 0)
+            .allowsHitTesting(showMemoButton)
 
             Button { showDue = true } label: {
                 if badge.style == .none {
