@@ -200,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func newTodo() {
+        panel.keepFocusOnce = true   // 열면서 입력칸 포커스를 자동 해제하지 않게
         showPanel()
         UserDefaults.standard.set("tasks", forKey: SettingsKey.lastTab)
         state.focusNewTodo = true
