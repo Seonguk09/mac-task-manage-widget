@@ -150,11 +150,14 @@ private struct TunnelRow: View {
 
 /// 패널이 key 창이 아니면 기본 스위치가 회색(비활성)으로 그려진다. 상태가 늘 보이게 직접 그린다.
 private struct PillSwitch: ToggleStyle {
+    // 테마 색을 쓰면 켜짐 색은 강조색, 기본 테마는 초록 (연결 상태 점은 계속 초록).
+    @Environment(\.atmAccent) private var accent
+    @Environment(\.atmThemed) private var themed
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
         Capsule()
-            .fill(configuration.isOn ? Color.green : Color.secondary.opacity(0.3))
+            .fill(configuration.isOn ? (themed ? accent : Color.green) : Color.secondary.opacity(0.3))
             .frame(width: 26, height: 15)
             .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                 Circle().fill(.white).padding(2).shadow(radius: 0.5)

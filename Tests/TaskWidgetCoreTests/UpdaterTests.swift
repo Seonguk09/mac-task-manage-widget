@@ -97,6 +97,7 @@ final class UpdaterTests: XCTestCase {
         XCTAssertTrue(s.contains("cd '/Users/a b/task manager'"))
         XCTAssertTrue(s.contains(">> '/L/Application Support/update.log'"))
         XCTAssertTrue(s.contains("UPDATE_FAILED"))
+        XCTAssertTrue(s.contains("pgrep -x TaskWidget >/dev/null || open ~/Applications/ATM.app"), "안 떠 있으면 한 번 더 연다")
     }
 
     func testRealGitReportsBehind() throws {
