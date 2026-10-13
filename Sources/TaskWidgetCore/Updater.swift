@@ -118,6 +118,8 @@ public struct Updater {
         git pull --ff-only || fail "git pull"
         make install || fail "make install"
         open ~/Applications/ATM.app
+        sleep 3
+        pgrep -x TaskWidget >/dev/null || open ~/Applications/ATM.app
         echo "UPDATE_OK"
 
         """

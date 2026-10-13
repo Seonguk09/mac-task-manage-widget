@@ -40,6 +40,8 @@ app: doctor
 
 install: app
 	-pkill -x TaskWidget
+	@# 종료 시 Teleport 정리로 몇 초 걸린다. 다 꺼지기 전에 열면 꺼지는 중인 앱만 앞으로 와서 새 앱이 안 뜬다.
+	@for i in $$(seq 1 75); do pgrep -x TaskWidget >/dev/null || break; sleep 0.2; done
 	rm -rf "$(INSTALL_DIR)/TaskWidget.app" "$(INSTALL_DIR)/ATM.app"
 	mkdir -p "$(INSTALL_DIR)"
 	cp -R $(APP) "$(INSTALL_DIR)/"
