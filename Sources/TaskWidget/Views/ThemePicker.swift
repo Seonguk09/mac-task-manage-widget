@@ -8,22 +8,37 @@ struct ThemeColorPicker: View {
     @AppStorage(SettingsKey.customAccent) private var customAccent = ThemePalette.defaultAccent
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    @State private var showCustom = false
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(ThemePalette.presets) { p in thumbnail(p) }
         }
-        DisclosureGroup("직접 조합") {
+        // DisclosureGroup 은 설정 폼 안에서 내용을 오른쪽 칸으로 들여써 좁은 창에서 잘린다. 폭 전체를 쓰는 펼치기로 직접 만든다.
+        Button { withAnimation(.easeOut(duration: 0.15)) { showCustom.toggle() } } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .rotationEffect(.degrees(showCustom ? 90 : 0))
+                Text("직접 조합")
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        if showCustom {
             VStack(alignment: .leading, spacing: 8) {
                 Text("배경").font(.caption).foregroundStyle(.secondary)
-                bgRow(ThemePalette.lightBackgrounds)
-                bgRow(ThemePalette.darkBackgrounds)
+                bgGrid(ThemePalette.lightBackgrounds)
+                bgGrid(ThemePalette.darkBackgrounds)
                 Text("강조색").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
-                HStack(spacing: 8) {
+                // 폭이 모자라면 줄바꿈 (고정 한 줄이면 좁은 창에서 잘린다)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8)], alignment: .leading, spacing: 8) {
                     ForEach(ThemePalette.accents, id: \.self) { hex in
                         let on = preset == ThemePalette.customID && customAccent == hex
                         Circle().fill(Color(hex: hex)).frame(width: 22, height: 22)
                             .overlay(Circle().strokeBorder(Color.primary, lineWidth: on ? 2 : 0).padding(-3))
+                            .frame(width: 28, height: 28)
                             .contentShape(Circle())
                             .onTapGesture { pickCustom(accent: hex) }
                     }
@@ -32,17 +47,18 @@ struct ThemeColorPicker: View {
                     Text("강조색이 배경과 비슷해 잘 안 보일 수 있어요").font(.caption).foregroundStyle(.orange)
                 }
             }
-            .padding(.top, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func bgRow(_ list: [String]) -> some View {
-        HStack(spacing: 6) {
+    private func bgGrid(_ list: [String]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 32, maximum: 36), spacing: 6)], alignment: .leading, spacing: 6) {
             ForEach(list, id: \.self) { hex in
                 let on = preset == ThemePalette.customID && customBackground == hex
                 RoundedRectangle(cornerRadius: 6).fill(Color(hex: hex)).frame(width: 26, height: 26)
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.35), lineWidth: 0.5))
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary, lineWidth: on ? 2 : 0).padding(-3))
+                    .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
                     .onTapGesture { pickCustom(background: hex) }
             }
