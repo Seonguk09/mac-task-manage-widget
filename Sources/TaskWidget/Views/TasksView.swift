@@ -11,6 +11,7 @@ struct TasksView: View {
     @State private var newTitle = ""
     @State private var doneExpanded = false
     @FocusState private var addFocused: Bool
+    @Environment(\.atmAccent) private var accent
 
     var body: some View {
         let open = state.openTodos(byTag: sortByTag)
@@ -48,9 +49,15 @@ struct TasksView: View {
     private func todoSection(_ open: [Todo]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             TextField("할 일 추가…", text: $newTitle)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .font(.system(size: 12 * scale))
                 .focused($addFocused)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+                // 선택됐을 때만 테마 강조색 테두리 (시스템 파란 포커스 링 대신)
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(addFocused ? accent : Color.primary.opacity(0.12), lineWidth: addFocused ? 1.5 : 0.5))
                 .onSubmit {
                     state.addTodo(newTitle)
                     newTitle = ""
