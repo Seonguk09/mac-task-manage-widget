@@ -10,10 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let state = AppState()
     private var defaultsObserver: Any?
     private var settingsObserver: Any?
+    private var hotKeyRecObserver: Any?
     private var settingsWindow: NSWindow?
     private var scheduler: Scheduler!
     private var updateTask: Task<Void, Never>?
     private var hotKey: GlobalHotKey!
+    private var hotKeyRecording = false
     private var todosSub: AnyCancellable?
     private var badgeTimer: Timer?
     private var sigterm: DispatchSourceSignal?
@@ -62,6 +64,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         hotKey = GlobalHotKey { [weak self] in self?.hotKeyToggle() }
+        hotKeyRecObserver = NotificationCenter.default.addObserver(
+            forName: .hotKeyRecording, object: nil, queue: .main
+        ) { [weak self] note in
+            let on = note.object as? Bool ?? false
+            MainActor.assumeIsolated { self?.hotKeyRecording = on; self?.syncHotKey() }
+        }
         syncHotKey()
 
         // 메뉴바 배지: 할 일이 바뀔 때 + 1분마다(날짜 넘어감)
@@ -173,7 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func togglePanel() { panel.toggle() }
 
     private func syncHotKey() {
-        if Settings.shared.globalHotKeyEnabled { hotKey.register() } else { hotKey.unregister() }
+        if Settings.shared.globalHotKeyEnabled && !hotKeyRecording {
+            hotKey.register(Settings.shared.globalHotKey)
+        } else {
+            hotKey.unregister()
+        }
     }
 
     private func hotKeyToggle() {

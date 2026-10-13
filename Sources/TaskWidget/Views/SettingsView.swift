@@ -174,7 +174,8 @@ struct SettingsView: View {
         Section("창") {
             Toggle("항상 위", isOn: $alwaysOnTop)
             Toggle("모든 Spaces에 표시", isOn: $allSpaces)
-            Toggle("전역 단축키 ⌃⌥Space 로 패널 열기/닫기", isOn: $globalHotKey)
+            Toggle("전역 단축키로 패널 열기/닫기", isOn: $globalHotKey)
+            if globalHotKey { HotKeyRecorder() }
         }
         Section("탭") {
             let ids = allTabs.map(\.id)
