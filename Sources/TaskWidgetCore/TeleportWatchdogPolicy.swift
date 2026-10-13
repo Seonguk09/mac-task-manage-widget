@@ -20,7 +20,7 @@ public struct TeleportWatchdogPolicy: Equatable {
         seconds < 60 ? "\(max(1, Int(seconds.rounded(.up))))초 후" : "\(Int((seconds / 60).rounded(.up)))분 후"
     }
 
-    /// - healthy: DB 가 실제로 응답하는 터널 (프로세스 생존 여부와 별개로 판단한다).
+    /// - healthy: 포트가 열려 있는 터널.
     /// - retryAt: 실패한 터널의 다음 시도 시각.
     public static func decide(wanted: [String], running: Set<String>, healthy: Set<String>,
                               retryAt: [String: Date], loggedIn: Bool, now: Date = Date()) -> TeleportWatchdogPolicy {
