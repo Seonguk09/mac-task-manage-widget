@@ -16,6 +16,7 @@ struct NotesSettingsSections: View {
     @State private var askTouchPw = false
     @State private var touchPw = ""
     @State private var message = ""
+    @State private var touchMessage = ""
     @State private var isError = false
     @State private var busy = false
     @State private var confluenceStatus = ""
@@ -23,8 +24,8 @@ struct NotesSettingsSections: View {
     var body: some View {
         Section {
             if !notes.hasLock {
-                SecureField("새 비밀번호", text: $pw)
-                SecureField("비밀번호 확인", text: $pw2)
+                pwField("새 비밀번호", $pw)
+                pwField("비밀번호 확인", $pw2)
                 HStack {
                     Button("만들기") { run { try await notes.createPassword(pw, confirm: pw2); pw = ""; pw2 = ""; return "비밀번호를 만들었어요" } }
                         .disabled(busy)
@@ -34,9 +35,9 @@ struct NotesSettingsSections: View {
             } else {
                 LabeledContent("상태", value: "설정됨")
                 if showChange {
-                    SecureField("현재 비밀번호", text: $oldPw)
-                    SecureField("새 비밀번호", text: $pw)
-                    SecureField("새 비밀번호 확인", text: $pw2)
+                    pwField("현재 비밀번호", $oldPw)
+                    pwField("새 비밀번호", $pw)
+                    pwField("새 비밀번호 확인", $pw2)
                     HStack {
                         Button("변경") {
                             run {
@@ -63,6 +64,8 @@ struct NotesSettingsSections: View {
         } footer: {
             Text("메모마다 잠금을 켤 수 있고, 비밀번호는 모든 잠긴 메모가 함께 씁니다. 잠긴 메모는 패널을 닫거나 5분이 지나면 다시 잠겨요.")
                 .font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .confirmationDialog("비밀번호를 초기화할까요?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("잠긴 메모를 모두 삭제하고 초기화", role: .destructive) {
@@ -75,18 +78,21 @@ struct NotesSettingsSections: View {
 
         Section {
             Toggle("Touch ID로 열기", isOn: Binding(
-                get: { notes.touchIDEnabled },
+                get: { notes.touchIDEnabled || askTouchPw },
                 set: { on in
-                    if on { askTouchPw = true } else { Task { await notes.disableTouchID() } }
+                    if on { askTouchPw = true } else if askTouchPw { askTouchPw = false; touchPw = "" } else { Task { await notes.disableTouchID() } }
                 }
             ))
             .disabled(!notes.hasLock || !NotesModel.touchIDAvailable)
             if askTouchPw {
+                pwField("잠금 비밀번호", $touchPw).onSubmit { enableTouchID() }
                 HStack {
-                    SecureField("비밀번호 확인", text: $touchPw).onSubmit { enableTouchID() }
                     Button("켜기") { enableTouchID() }.disabled(busy)
                     Button("취소") { askTouchPw = false; touchPw = "" }
                 }
+            }
+            if !touchMessage.isEmpty {
+                Text(touchMessage).font(.caption).foregroundStyle(.red)
             }
             if !NotesModel.touchIDAvailable {
                 Text("이 Mac 에서는 Touch ID 를 쓸 수 없어요").font(.caption).foregroundStyle(.secondary)
@@ -98,6 +104,8 @@ struct NotesSettingsSections: View {
         } footer: {
             Text("Touch ID 를 켜면 메모 열쇠가 앱 비밀 저장소(키체인 또는 secrets.json)에 저장됩니다. 끄면 지워져요.")
                 .font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
 
         Section {
@@ -117,8 +125,16 @@ struct NotesSettingsSections: View {
         } footer: {
             Text("Jira 와 같은 Atlassian 계정 토큰을 씁니다. 비워 두면 노트 탭에서 Confluence 별표 문서를 숨겨요.")
                 .font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onDisappear { Settings.shared.confluenceBaseURL = confluenceDraft.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// grouped Form 의 SecureField 는 prompt 가 없으면 입력칸이 보이지 않는다. 자동완성 말풍선도 막는다.
+    private func pwField(_ label: String, _ text: Binding<String>) -> some View {
+        SecureField(label, text: text, prompt: Text("입력"))
+            .textContentType(.oneTimeCode)
     }
 
     /// 비동기 동작을 돌리고 결과/오류를 한 줄로 보여준다.
@@ -133,10 +149,13 @@ struct NotesSettingsSections: View {
 
     private func enableTouchID() {
         let p = touchPw
-        run {
-            try await notes.enableTouchID(password: p)
-            askTouchPw = false; touchPw = ""
-            return "Touch ID 를 켰어요"
+        busy = true; touchMessage = ""
+        Task {
+            defer { busy = false }
+            do {
+                try await notes.enableTouchID(password: p)
+                askTouchPw = false; touchPw = ""; touchMessage = ""
+            } catch { touchMessage = error.localizedDescription }
         }
     }
 }
