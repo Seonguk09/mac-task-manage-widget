@@ -47,10 +47,45 @@ extension View {
 }
 
 /// 팝오버 배경을 패널 테마 배경과 맞춘다 (기본은 회색 시스템 팝오버).
+/// presentationBackground 는 말풍선 꼬리를 칠하지 못해서, 팝오버 창의 프레임 뷰(꼬리 포함) 맨 아래에 색 뷰를 깐다.
 struct ThemedPopover: ViewModifier {
     @Environment(\.atmBackground) private var bg
     func body(content: Content) -> some View {
-        if let bg { content.presentationBackground(bg) } else { content }
+        if let bg { content.background(PopoverFrameColor(color: NSColor(bg))) } else { content }
+    }
+}
+
+private struct PopoverFrameColor: NSViewRepresentable {
+    let color: NSColor
+
+    func makeNSView(context: Context) -> NSView { Probe(color: color) }
+    func updateNSView(_ v: NSView, context: Context) { (v as? Probe)?.apply(color) }
+
+    final class Probe: NSView {
+        private var color: NSColor
+        private weak var fill: NSView?
+        init(color: NSColor) { self.color = color; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply(color)
+        }
+
+        func apply(_ c: NSColor) {
+            color = c
+            // contentView 의 superview 가 꼬리까지 그리는 팝오버 프레임
+            guard let frame = window?.contentView?.superview else { return }
+            let v = fill ?? {
+                let v = NSView(frame: frame.bounds)
+                v.autoresizingMask = [.width, .height]
+                v.wantsLayer = true
+                frame.addSubview(v, positioned: .below, relativeTo: frame.subviews.first)
+                fill = v
+                return v
+            }()
+            v.layer?.backgroundColor = c.cgColor
+        }
     }
 }
 
