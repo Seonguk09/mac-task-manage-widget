@@ -208,7 +208,7 @@ struct JiraIssue: Codable, Identifiable, Equatable {
 | 창 | `alwaysOnTop` | Bool | true |
 | 창 | `allSpaces` | Bool | true |
 | 일반 | 로그인 시 실행 | — | `SMAppService.mainApp.status`에서 읽고 register/unregister |
-| Jira | `jiraBaseURL` | String | `https://midasitweb-jira.atlassian.net` |
+| Jira | `jiraBaseURL` | String | `https://your-site.atlassian.net` |
 | Jira | `jiraEmail` | String | `""` |
 | Jira | 토큰 | Keychain | — |
 | Jira | `jiraRefreshMinutes` | Int | 5 (1/5/15) |

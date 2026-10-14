@@ -827,7 +827,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.fontScale, 1.0)
         XCTAssertTrue(s.alwaysOnTop)
         XCTAssertTrue(s.allSpaces)
-        XCTAssertEqual(s.jiraBaseURL, "https://midasitweb-jira.atlassian.net")
+        XCTAssertEqual(s.jiraBaseURL, "https://your-site.atlassian.net")
         XCTAssertEqual(s.jiraEmail, "")
         XCTAssertEqual(s.jiraRefreshMinutes, 5)
         XCTAssertEqual(s.jiraJQL, "")
@@ -895,7 +895,7 @@ public enum SettingsKey {
 
 public final class Settings {
     public static let shared = Settings()
-    public static let defaultJiraBaseURL = "https://midasitweb-jira.atlassian.net"
+    public static let defaultJiraBaseURL = "https://your-site.atlassian.net"
 
     private let d: UserDefaults
 
@@ -3888,13 +3888,13 @@ struct JiraRow: View {
 ```bash
 swift build 2>&1 | grep -E "error"
 # 임시: 이메일 설정 + 토큰을 Keychain 에 넣는다 (토큰은 ~/.claude/credentials.md 의 Atlassian API Token 값을 직접 입력 — 명령 기록에 남지 않게 read 사용)
-defaults write com.lsm0506.TaskWidget jiraEmail lsm0506@midasin.com
-read -s TOKEN && security add-generic-password -U -s com.lsm0506.TaskWidget.jira -a lsm0506@midasin.com -w "$TOKEN" && unset TOKEN
+defaults write com.lsm0506.TaskWidget jiraEmail me@example.com
+read -s TOKEN && security add-generic-password -U -s com.lsm0506.TaskWidget.jira -a me@example.com -w "$TOKEN" && unset TOKEN
 make run
 ```
 Expected:
 - Jira 섹션에 상태별 그룹("진행 중 · n" 등) + 이슈 행. 우선순위 점 색상.
-- 행 클릭 → 브라우저에 `https://midasitweb-jira.atlassian.net/browse/NMRS-xxxxx` 열림.
+- 행 클릭 → 브라우저에 `https://your-site.atlassian.net/browse/NMRS-xxxxx` 열림.
 - 푸터에 "↻ HH:mm 갱신". ↻ 버튼 클릭 → 스피너 잠깐 → 시각 갱신.
 - 토큰을 틀린 값으로 바꾸고(`security add-generic-password -U ... -w wrong`) ↻ → 빨간 "토큰 확인 필요 (401/403)" + 기존 목록 유지.
 - `defaults delete com.lsm0506.TaskWidget jiraEmail` 후 재실행 → "설정에서 Jira 토큰 입력" 버튼만 보임.
