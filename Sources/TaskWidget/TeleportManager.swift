@@ -172,10 +172,21 @@ final class TeleportManager: ObservableObject {
         defer { loginCancel = nil; loginStarted = nil }
         let last = Self.lastOTPCounter
         let used = OTPBox()
-        let (res, report) = await Task.detached {
+        var (res, report) = await Task.detached {
             login.runReported(password: sec.password, otp: { let r = totp.freshCode(after: last); used.counter = r.counter; return r.code })
         }.value
         TeleportLoginLog.append(kind: kind, user: config.user, proxy: config.proxy, tsh: tsh, report: report, result: res)
+        // 빈 인증서 파일 때문에 tsh 가 바로 죽으면 그 파일만 지우고 한 번 더 시도한다.
+        if case .failure(let e) = res, e.message.contains(TshProfileRepair.errorMarker) {
+            let removed = await Task.detached { TshProfileRepair.removeEmptyFiles() }.value
+            if !removed.isEmpty {
+                DiagLog.append("teleport: 빈 tsh 인증서 파일 정리 후 재시도: \(removed.joined(separator: ", "))")
+                (res, report) = await Task.detached {
+                    login.runReported(password: sec.password, otp: { let r = totp.freshCode(after: used.counter ?? last); used.counter = r.counter; return r.code })
+                }.value
+                TeleportLoginLog.append(kind: kind + "+repair", user: config.user, proxy: config.proxy, tsh: tsh, report: report, result: res)
+            }
+        }
         if let c = used.counter { Self.lastOTPCounter = c }
         switch res {
         case .success:
