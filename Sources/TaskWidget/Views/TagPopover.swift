@@ -71,5 +71,6 @@ struct TagPopover: View {
         }
         .padding(10)
         .frame(minWidth: 150)
+        .themedPopover()
     }
 }

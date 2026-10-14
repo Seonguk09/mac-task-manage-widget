@@ -286,7 +286,6 @@ private struct LinkEditPopover: View {
     @State private var title: String
     @State private var url: String
     @State private var error = ""
-    @FocusState private var titleFocused: Bool
 
     init(notes: NotesModel, link: SavedLink, done: @escaping () -> Void) {
         self.notes = notes; self.link = link; self.done = done
@@ -296,24 +295,16 @@ private struct LinkEditPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("이름").font(.system(size: 10.5)).foregroundStyle(.secondary)
-            TextField("비우면 페이지 제목", text: $title)
-                .focused($titleFocused)
-                .onSubmit { save() }
-            Text("주소").font(.system(size: 10.5)).foregroundStyle(.secondary)
-            TextField("https://", text: $url)
-                .onSubmit { save() }
+            Text("이름").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+            ThemedTextField(prompt: "비우면 페이지 제목", text: $title, autofocus: true, onSubmit: save)
+            Text("주소").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary).padding(.top, 2)
+            ThemedTextField(prompt: "https://", text: $url, onSubmit: save)
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("취소") { done() }
-                Button("저장") { save() }.keyboardShortcut(.defaultAction)
-            }
+            PopoverButtons(primary: "저장", cancel: done, submit: save).padding(.top, 4)
         }
-        .textFieldStyle(.roundedBorder)
         .padding(12)
         .frame(width: 280)
-        .onAppear { DispatchQueue.main.async { titleFocused = true } }
+        .themedPopover()
     }
 
     private func save() {
@@ -635,7 +626,6 @@ private struct UnlockPopover: View {
     @State private var pw = ""
     @State private var error: String
     @State private var busy = false
-    @FocusState private var focused: Bool
 
     init(notes: NotesModel, memoId: UUID, initialError: String, done: @escaping () -> Void) {
         self.notes = notes; self.memoId = memoId; self.done = done
@@ -644,24 +634,14 @@ private struct UnlockPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("비밀번호 입력").font(.headline)
-            SecureField("비밀번호", text: $pw)
-                .textFieldStyle(.roundedBorder)
-                .textContentType(.oneTimeCode)
-                .focused($focused)
-                .onSubmit { submit() }
+            Text("비밀번호 입력").font(.system(size: 12.5, weight: .semibold))
+            ThemedTextField(prompt: "비밀번호", text: $pw, secure: true, autofocus: true, onSubmit: submit)
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("취소") { done() }
-                Button("열기") { submit() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(busy || pw.isEmpty)
-            }
+            PopoverButtons(primary: "열기", busy: busy || pw.isEmpty, cancel: done, submit: submit).padding(.top, 2)
         }
         .padding(12)
         .frame(width: 230)
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .themedPopover()
     }
 
     private func submit() {
@@ -686,33 +666,23 @@ private struct NotePasswordPopover: View {
     @State private var confirm = ""
     @State private var error = ""
     @State private var busy = false
-    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(mode == .create ? "잠금 비밀번호 만들기" : "비밀번호 확인").font(.headline)
-            SecureField("비밀번호", text: $pw)
-                .focused($focused)
-                .onSubmit { submit() }
+            Text(mode == .create ? "잠금 비밀번호 만들기" : "비밀번호 확인").font(.system(size: 12.5, weight: .semibold))
+            ThemedTextField(prompt: "비밀번호", text: $pw, secure: true, autofocus: true, onSubmit: submit)
             if mode == .create {
-                SecureField("비밀번호 확인", text: $confirm)
-                    .onSubmit { submit() }
+                ThemedTextField(prompt: "비밀번호 확인", text: $confirm, secure: true, onSubmit: submit)
                 Text("비밀번호를 잊으면 잠긴 메모는 되살릴 수 없습니다.")
                     .font(.caption).foregroundStyle(.orange)
             }
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("취소") { done() }
-                Button(mode == .create ? "만들고 잠그기" : "잠그기") { submit() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(busy)
-            }
+            PopoverButtons(primary: mode == .create ? "만들고 잠그기" : "잠그기", busy: busy, cancel: done, submit: submit)
+                .padding(.top, 2)
         }
-        .textFieldStyle(.roundedBorder)
         .padding(12)
         .frame(width: 250)
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .themedPopover()
     }
 
     private func submit() {

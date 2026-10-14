@@ -129,6 +129,7 @@ struct JiraTransitionPopover: View {
         }
         .padding(6)
         .frame(minWidth: 170, alignment: .leading)
+        .themedPopover()
         .task {
             guard issue.transitions == nil else { return }
             do { items = try await state.loadTransitions(for: issue.id) }
