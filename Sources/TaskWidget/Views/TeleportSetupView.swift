@@ -227,6 +227,7 @@ struct TeleportSetupView: View {
                         }
                     HStack {
                         Button("QR 이미지로 읽기") { m.readQR() }.controlSize(.small)
+                        Link("OTP 키 구하는 법 ↗", destination: Links.otpKeyGuide).font(.system(size: 11 * scale))
                         TimelineView(.periodic(from: .now, by: 1)) { ctx in
                             if let t = TOTP(input: m.otpKey) {
                                 let c = t.code(at: ctx.date)

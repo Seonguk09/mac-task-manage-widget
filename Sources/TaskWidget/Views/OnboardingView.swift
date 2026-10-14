@@ -615,6 +615,7 @@ private struct TeleportOnboardingBody: View {
                 }
                 Text("Google OTP 등록할 때 받은 긴 영문 키예요 (QR 아래 '키 직접 입력'). QR 이미지가 있으면 [QR 읽기]")
                     .font(.system(size: 10.5 * scale)).foregroundStyle(.secondary)
+                Link("OTP 키를 모르면: OTP 키 구하는 법 ↗", destination: Links.otpKeyGuide).font(.system(size: 11 * scale))
             }
             Text("입력한 값은 2단계에서 고른 곳에만 저장돼요. 매번 OTP 를 칠 필요 없이 앱이 대신 로그인해요.")
                 .font(.system(size: 10.5 * scale)).foregroundStyle(.secondary)
