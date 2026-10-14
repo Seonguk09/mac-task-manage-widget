@@ -437,7 +437,7 @@ private struct MemoRow: View {
                 if memo.locked {
                     HStack(spacing: 6) {
                         Button { notes.relockAll() } label: {
-                            NoteChip(icon: "lock.fill", text: "지금 잠그기")
+                            AccentChip(icon: "lock.fill", text: "지금 잠그기")
                         }
                         .buttonStyle(.plain)
                         RelockLabel(notes: notes)
@@ -556,7 +556,7 @@ private struct LockedPanel: View {
     @State private var busy = false
 
     var body: some View {
-        Button { openTapped() } label: { NoteChip(icon: "lock.open.fill", text: "열기") }
+        Button { openTapped() } label: { AccentChip(icon: "lock.open.fill", text: "열기") }
             .buttonStyle(.plain)
             .disabled(busy)
             .popover(isPresented: $askPassword, arrowEdge: .bottom) {
@@ -683,28 +683,5 @@ private struct NotePasswordPopover: View {
                 self.error = error.localizedDescription
             }
         }
-    }
-}
-
-/// 노트 탭의 작은 강조 알약 버튼 모양 (하위 할 일 개수 알약과 같은 톤).
-private struct NoteChip: View {
-    let icon: String
-    let text: String?
-    @Environment(\.fontScale) private var scale
-    @Environment(\.atmAccent) private var accent
-    @Environment(\.isEnabled) private var enabled
-    @State private var hover = false
-
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: (text == nil ? 12 : 9.5) * scale, weight: .semibold))
-            if let text { Text(text).font(.system(size: 11 * scale, weight: .medium)) }
-        }
-        .foregroundStyle(accent)
-        .padding(.horizontal, text == nil ? 6 : 8).padding(.vertical, 3)
-        .background(Capsule().fill(accent.opacity(hover && enabled ? 0.26 : 0.16)))
-        .opacity(enabled ? 1 : 0.5)
-        .contentShape(Capsule())
-        .onHover { hover = $0 }
     }
 }

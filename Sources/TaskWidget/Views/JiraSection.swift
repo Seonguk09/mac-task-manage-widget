@@ -90,38 +90,97 @@ struct JiraSection: View {
     }
 }
 
-/// 상태 변경 팝오버. (열린 NSMenu 는 비동기 로드 후 다시 그려지지 않아 팝오버를 쓴다.)
+/// 상태 변경 팝오버: 맨 위에 지금 상태(✓), 아래에 바꿀 수 있는 상태를 종류 색 점과 함께.
+/// 목록 조회 때 같이 받은 transitions 가 있으면 바로 보여주고, 없을 때만 따로 받는다.
+/// (열린 NSMenu 는 비동기 로드 후 다시 그려지지 않아 팝오버를 쓴다.)
 struct JiraTransitionPopover: View {
     @EnvironmentObject var state: AppState
     let issue: JiraIssue
     let close: () -> Void
     @State private var items: [JiraTransition]?
     @State private var error: String?
+    @Environment(\.atmAccent) private var accent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
+            header("현재")
+            row(issue.status, category: issue.statusCategory, current: true) {}
+            header("바꾸기").padding(.top, 4)
             if let error {
-                Text(error).foregroundStyle(.red).frame(maxWidth: 260, alignment: .leading)
-            } else if let items {
+                Text(error).font(.system(size: 11)).foregroundStyle(.red)
+                    .frame(maxWidth: 220, alignment: .leading).padding(.horizontal, 8).padding(.vertical, 4)
+            } else if let items = items ?? issue.transitions {
                 let next = items.filter { $0.toName != issue.status }
-                if next.isEmpty { Text("가능한 전환 없음").foregroundStyle(.secondary) }
+                if next.isEmpty {
+                    Text("가능한 전환 없음").font(.system(size: 12)).foregroundStyle(.secondary)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                }
                 ForEach(next) { t in
-                    Button("→ \(t.toName)") {
+                    row(t.toName, category: t.toCategory, current: false) {
                         close()
                         Task { await state.transitionJira(issue.id, to: t) }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 2)
                 }
             } else {
                 HStack(spacing: 6) { ProgressView().controlSize(.small); Text("불러오는 중…") }
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
             }
         }
-        .font(.system(size: 12))
-        .padding(10)
+        .padding(6)
+        .frame(minWidth: 170, alignment: .leading)
         .task {
+            guard issue.transitions == nil else { return }
             do { items = try await state.loadTransitions(for: issue.id) }
             catch { self.error = (error as? JiraError)?.userMessage ?? error.localizedDescription }
+        }
+    }
+
+    private func header(_ text: String) -> some View {
+        Text(text).font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+            .padding(.horizontal, 8).padding(.top, 2).padding(.bottom, 1)
+    }
+
+    private func row(_ name: String, category: String, current: Bool, _ action: @escaping () -> Void) -> some View {
+        TransitionRow(name: name, color: JiraStatusColor.color(category, accent: accent), current: current, action: action)
+    }
+}
+
+private struct TransitionRow: View {
+    let name: String
+    let color: Color
+    let current: Bool
+    let action: () -> Void
+    @Environment(\.atmAccent) private var accent
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Circle().fill(color).frame(width: 7, height: 7)
+                Text(name).font(.system(size: 12, weight: current ? .semibold : .regular))
+                    .foregroundStyle(current ? accent : Color.primary)
+                Spacer(minLength: 8)
+                if current { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(accent) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(
+                current ? accent.opacity(0.16) : (hover ? Color.primary.opacity(0.07) : .clear)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .allowsHitTesting(!current)   // disabled 는 흐리게 그려져서 지금 상태가 안 보인다
+        .onHover { hover = $0 }
+    }
+}
+
+/// 상태 종류(new / indeterminate / done)별 색. 상태 알약과 팝오버 점이 같은 색을 쓴다.
+enum JiraStatusColor {
+    static func color(_ category: String, accent: Color) -> Color {
+        switch category {
+        case "indeterminate": return accent
+        case "done": return .green
+        default: return .secondary
         }
     }
 }
@@ -135,13 +194,7 @@ struct JiraStatusPill: View {
     @Environment(\.atmAccent) private var accent
     @State private var hover = false
 
-    private var tint: Color {
-        switch category {
-        case "indeterminate": return accent
-        case "done": return .green
-        default: return .secondary
-        }
-    }
+    private var tint: Color { JiraStatusColor.color(category, accent: accent) }
 
     var body: some View {
         Button(action: action) {
