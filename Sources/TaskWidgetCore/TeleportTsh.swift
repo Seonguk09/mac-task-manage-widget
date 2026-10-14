@@ -274,3 +274,30 @@ public struct TeleportLogin {
         return "tsh 로그인 실패 (exit \(status))" + (shown.isEmpty ? "" : ": " + shown.joined(separator: " / "))
     }
 }
+
+/// tsh 가 인증서를 쓰다 죽으면(앱 종료 등) `~/.tsh/keys` 에 0바이트 파일이 남고, 이후 모든 `tsh login` 이
+/// "missing PEM encoded block" 으로 바로 실패한다. 빈 파일만 지우면 다음 로그인이 다시 받아 온다.
+public enum TshProfileRepair {
+    public static let errorMarker = "missing PEM encoded block"
+
+    public static var defaultKeysDir: URL {
+        let home = ProcessInfo.processInfo.environment["TELEPORT_HOME"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".tsh")
+        return home.appendingPathComponent("keys", isDirectory: true)
+    }
+
+    /// keys 아래 0바이트 일반 파일을 지우고, 지운 경로(keys 기준 상대)를 돌려준다.
+    @discardableResult
+    public static func removeEmptyFiles(in keysDir: URL = defaultKeysDir) -> [String] {
+        let fm = FileManager.default
+        guard let e = fm.enumerator(atPath: keysDir.path) else { return [] }
+        var removed: [String] = []
+        for case let rel as String in e {
+            let url = keysDir.appendingPathComponent(rel)
+            guard let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                  v.isRegularFile == true, v.fileSize == 0 else { continue }
+            if (try? fm.removeItem(at: url)) != nil { removed.append(rel) }
+        }
+        return removed.sorted()
+    }
+}
