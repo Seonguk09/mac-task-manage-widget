@@ -46,7 +46,7 @@ final class DiagnosticsTests: XCTestCase {
     }
 
     func testMaskEmail() {
-        XCTAssertEqual(DiagnosticsExport.maskEmail("lsm0506@midasin.com"), "***@midasin.com")
+        XCTAssertEqual(DiagnosticsExport.maskEmail("me@example.com"), "***@example.com")
         XCTAssertEqual(DiagnosticsExport.maskEmail(""), "(없음)")
     }
 
@@ -54,7 +54,7 @@ final class DiagnosticsTests: XCTestCase {
         let src = """
         {
             jiraBaseURL = "https://x.atlassian.net";
-            jiraEmail = "me@midasin.com";
+            jiraEmail = "me@example.com";
             jiraApiToken = abc;
             teleportOtpKey = (
                 "AAAA",
@@ -69,7 +69,7 @@ final class DiagnosticsTests: XCTestCase {
         """
         let out = DiagnosticsExport.redactDefaults(src)
         for bad in ["abc", "AAAA", "BBBB", "me@", "my-Secret", "a = 1"] { XCTAssertFalse(out.contains(bad), "\(bad)\n\(out)") }
-        for good in ["jiraBaseURL", "***@midasin.com", "enabledTabs", "opacity = 1;"] { XCTAssertTrue(out.contains(good), "\(good)\n\(out)") }
+        for good in ["jiraBaseURL", "***@example.com", "enabledTabs", "opacity = 1;"] { XCTAssertTrue(out.contains(good), "\(good)\n\(out)") }
     }
 
     /// 실제 PTY 로 돌려 본 기록. 비밀번호·OTP 는 어디에도 남지 않는다.
@@ -137,12 +137,12 @@ final class DiagnosticsTests: XCTestCase {
     func testInfoTextHasNoSecrets() {
         let suite = UserDefaults(suiteName: "diag-\(UUID().uuidString)")!
         let s = Settings(defaults: suite)
-        s.jiraEmail = "me@midasin.com"; s.jiraBaseURL = "https://x.atlassian.net"
+        s.jiraEmail = "me@example.com"; s.jiraBaseURL = "https://x.atlassian.net"
         let cfg = TeleportConfig(proxy: "p.example.com", user: "tester", tunnels: [TeleportTunnel(name: "mrs-dv", port: 4306)])
         let i = DiagnosticsExport.InfoInput(build: BuildInfo(infoDictionary: [:]), settings: s, teleport: cfg, tshPath: "/x/tsh",
                                             claudePath: nil, hasJiraToken: true, hasTeleportSecrets: false)
         let t = DiagnosticsExport.infoText(i, run: { exe, _ in "out(\(exe))" })
-        XCTAssertTrue(t.contains("email=***@midasin.com"))
+        XCTAssertTrue(t.contains("email=***@example.com"))
         XCTAssertFalse(t.contains("me@"))
         XCTAssertTrue(t.contains("jira token 있음: yes") && t.contains("teleport 비밀 정보 있음: no"))
         XCTAssertTrue(t.contains("tunnel mrs-dv port=4306"))
