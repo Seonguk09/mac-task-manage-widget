@@ -180,56 +180,87 @@ private func copyToPasteboard(_ s: String) {
     NSPasteboard.general.setString(s, forType: .string)
 }
 
-private struct LinkRow: View {
-    @ObservedObject var notes: NotesModel
-    let link: SavedLink
+/// 링크 줄 공통 모양: 왼쪽 출처 아이콘 상자 + 한 줄 제목 + 오른쪽 흐린 출처. 직접 저장한 링크와 Confluence 문서가 같은 모양.
+private struct LinkLine<Trailing: View>: View {
+    let icon: String
+    let tint: Color
+    let title: String
+    let source: String
+    @ViewBuilder let trailing: (Bool) -> Trailing
     @Environment(\.fontScale) private var scale
-    @Environment(\.atmAccent) private var accent
     @State private var hovering = false
-    @State private var editing = false
-    @State private var draft = ""
-    @FocusState private var focused: Bool
 
     var body: some View {
+        // 한 덩어리로 묶어야 바깥의 popover·contextMenu 가 구분선에 따로 붙지 않는다.
+        VStack(spacing: 0) {
         HStack(spacing: 8) {
-            Image(systemName: "link")
-                .font(.system(size: 11 * scale))
-                .foregroundStyle(.secondary)
-                .frame(width: 16 * scale)
-            VStack(alignment: .leading, spacing: 1) {
-                if editing {
-                    TextField("", text: $draft)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12.5 * scale))
-                        .focused($focused)
-                        .onSubmit { commit() }
-                        .onExitCommand { editing = false }
-                        .onChange(of: focused) { _, f in if !f && editing { commit() } }
-                } else {
-                    Text(link.title)
-                        .font(.system(size: 12.5 * scale))
-                        .lineLimit(1)
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) { beginEdit() }
-                        .onTapGesture { open() }
-                        .truncationHelp(link.title, hint: "더블클릭하면 이름 수정")
-                }
-                Text(URL(string: link.url)?.host ?? link.url)
-                    .font(.system(size: 11 * scale)).foregroundStyle(.secondary).lineLimit(1)
-            }
+            Image(systemName: icon)
+                .font(.system(size: 10.5 * scale, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 20 * scale, height: 20 * scale)
+                .background(RoundedRectangle(cornerRadius: 5).fill(tint.opacity(0.14)))
+            Text(title)
+                .font(.system(size: 12.5 * scale))
+                .lineLimit(1)
+                .truncationHelp(title)
             Spacer(minLength: 4)
-            Group {
-                hoverButton("doc.on.doc", help: "주소 복사") { copyToPasteboard(link.url) }
-                hoverButton("pencil", help: "이름 수정") { beginEdit() }
-                hoverButton("xmark", help: "삭제", bold: true) { notes.deleteLink(link.id) }
+            if hovering {
+                trailing(true)
+            } else {
+                Text(source).font(.system(size: 10.5 * scale)).foregroundStyle(.secondary).lineLimit(1)
             }
-            .opacity(hovering ? 1 : 0)
         }
         .padding(.vertical, 5)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .onTapGesture { if !editing { open() } }
         Divider()
+        }
+    }
+}
+
+/// 자주 쓰는 사이트는 알아보기 쉬운 아이콘으로, 나머지는 지구본. (사이트 아이콘을 받아 오면 사내 페이지는 대부분 실패한다.)
+enum LinkSiteIcon {
+    static func icon(for host: String?) -> String {
+        let h = (host ?? "").lowercased()
+        func has(_ s: String) -> Bool { h == s || h.hasSuffix("." + s) }
+        if has("github.com") || has("bitbucket.org") || has("gitlab.com") { return "chevron.left.forwardslash.chevron.right" }
+        if has("datadoghq.com") { return "chart.xyaxis.line" }
+        if has("figma.com") { return "paintpalette" }
+        if h.contains("jira") { return "ticket" }
+        if has("atlassian.net") { return "doc.text" }
+        if has("slack.com") { return "number" }
+        if has("google.com") { return "doc.richtext" }
+        if has("notion.so") || has("notion.site") { return "note.text" }
+        return "globe"
+    }
+}
+
+private struct LinkRow: View {
+    @ObservedObject var notes: NotesModel
+    let link: SavedLink
+    @Environment(\.fontScale) private var scale
+    @State private var editing = false
+
+    var body: some View {
+        let host = URL(string: link.url)?.host
+        LinkLine(icon: LinkSiteIcon.icon(for: host), tint: .secondary, title: link.title, source: host ?? link.url) { _ in
+            HStack(spacing: 7) {
+                hoverButton("doc.on.doc", help: "주소 복사") { copyToPasteboard(link.url) }
+                hoverButton("pencil", help: "수정") { editing = true }
+                hoverButton("xmark", help: "삭제", bold: true) { notes.deleteLink(link.id) }
+            }
+        }
+        .onTapGesture { open() }
+        .popover(isPresented: $editing, arrowEdge: .bottom) {
+            LinkEditPopover(notes: notes, link: link) { editing = false }
+        }
+        .contextMenu {
+            Button("열기") { open() }
+            Button("주소 복사") { copyToPasteboard(link.url) }
+            Button("수정…") { editing = true }
+            Divider()
+            Button("삭제", role: .destructive) { notes.deleteLink(link.id) }
+        }
     }
 
     private func hoverButton(_ icon: String, help: String, bold: Bool = false, _ action: @escaping () -> Void) -> some View {
@@ -245,44 +276,50 @@ private struct LinkRow: View {
     private func open() {
         if let u = URL(string: link.url) { NSWorkspace.shared.open(u) }
     }
+}
 
-    private func beginEdit() {
-        draft = link.title
-        editing = true
-        DispatchQueue.main.async { focused = true }
+/// 링크 수정 창: 이름 + 주소. 이름을 비우면 새 주소의 페이지 제목을 받아 온다.
+private struct LinkEditPopover: View {
+    @ObservedObject var notes: NotesModel
+    let link: SavedLink
+    let done: () -> Void
+    @State private var title: String
+    @State private var url: String
+    @State private var error = ""
+
+    init(notes: NotesModel, link: SavedLink, done: @escaping () -> Void) {
+        self.notes = notes; self.link = link; self.done = done
+        _title = State(initialValue: link.title)
+        _url = State(initialValue: link.url)
     }
 
-    private func commit() {
-        guard editing else { return }
-        editing = false
-        notes.renameLink(link.id, draft)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("이름").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary)
+            ThemedTextField(prompt: "비우면 페이지 제목", text: $title, autofocus: true, onSubmit: save)
+            Text("주소").font(.system(size: 10.5, weight: .medium)).foregroundStyle(.secondary).padding(.top, 2)
+            ThemedTextField(prompt: "https://", text: $url, onSubmit: save)
+            if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
+            PopoverButtons(primary: "저장", cancel: done, submit: save).padding(.top, 4)
+        }
+        .padding(12)
+        .frame(width: 280)
+        .themedPopover()
+    }
+
+    private func save() {
+        guard notes.updateLink(link.id, title: title, url: url) else { error = "주소로 볼 수 없어요"; return }
+        done()
     }
 }
 
 private struct ConfluenceRow: View {
     let page: StarredPage
     @Environment(\.fontScale) private var scale
-    @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 11 * scale))
-                .foregroundStyle(Color.blue)
-                .frame(width: 16 * scale)
-            Text(page.title)
-                .font(.system(size: 12.5 * scale))
-                .lineLimit(1)
-                .truncationHelp(page.title)
-            if !page.spaceKey.isEmpty {
-                Text(page.spaceKey)
-                    .font(.system(size: 10 * scale, weight: .medium))
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Capsule().fill(Color.blue.opacity(0.15)))
-                    .foregroundStyle(Color.blue)
-            }
-            Spacer(minLength: 4)
-            if hovering {
+        LinkLine(icon: "doc.text", tint: .blue, title: page.title, source: page.spaceKey) { _ in
+            HStack(spacing: 7) {
                 if let d = page.updated {
                     Text(Self.agoText(d)).font(.system(size: 10.5 * scale)).foregroundStyle(.secondary)
                 }
@@ -293,11 +330,11 @@ private struct ConfluenceRow: View {
                 .help("주소 복사")
             }
         }
-        .padding(.vertical, 5)
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
         .onTapGesture { NSWorkspace.shared.open(page.url) }
-        Divider()
+        .contextMenu {
+            Button("열기") { NSWorkspace.shared.open(page.url) }
+            Button("주소 복사") { copyToPasteboard(page.url.absoluteString) }
+        }
     }
 
     private static func agoText(_ d: Date) -> String {
@@ -437,7 +474,7 @@ private struct MemoRow: View {
                 if memo.locked {
                     HStack(spacing: 6) {
                         Button { notes.relockAll() } label: {
-                            NoteChip(icon: "lock.fill", text: "지금 잠그기")
+                            AccentChip(icon: "lock.fill", text: "지금 잠그기")
                         }
                         .buttonStyle(.plain)
                         RelockLabel(notes: notes)
@@ -556,7 +593,7 @@ private struct LockedPanel: View {
     @State private var busy = false
 
     var body: some View {
-        Button { openTapped() } label: { NoteChip(icon: "lock.open.fill", text: "열기") }
+        Button { openTapped() } label: { AccentChip(icon: "lock.open.fill", text: "열기") }
             .buttonStyle(.plain)
             .disabled(busy)
             .popover(isPresented: $askPassword, arrowEdge: .bottom) {
@@ -589,7 +626,6 @@ private struct UnlockPopover: View {
     @State private var pw = ""
     @State private var error: String
     @State private var busy = false
-    @FocusState private var focused: Bool
 
     init(notes: NotesModel, memoId: UUID, initialError: String, done: @escaping () -> Void) {
         self.notes = notes; self.memoId = memoId; self.done = done
@@ -598,24 +634,14 @@ private struct UnlockPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("비밀번호 입력").font(.headline)
-            SecureField("비밀번호", text: $pw)
-                .textFieldStyle(.roundedBorder)
-                .textContentType(.oneTimeCode)
-                .focused($focused)
-                .onSubmit { submit() }
+            Text("비밀번호 입력").font(.system(size: 12.5, weight: .semibold))
+            ThemedTextField(prompt: "비밀번호", text: $pw, secure: true, autofocus: true, onSubmit: submit)
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("취소") { done() }
-                Button("열기") { submit() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(busy || pw.isEmpty)
-            }
+            PopoverButtons(primary: "열기", busy: busy || pw.isEmpty, cancel: done, submit: submit).padding(.top, 2)
         }
         .padding(12)
         .frame(width: 230)
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .themedPopover()
     }
 
     private func submit() {
@@ -640,33 +666,23 @@ private struct NotePasswordPopover: View {
     @State private var confirm = ""
     @State private var error = ""
     @State private var busy = false
-    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(mode == .create ? "잠금 비밀번호 만들기" : "비밀번호 확인").font(.headline)
-            SecureField("비밀번호", text: $pw)
-                .focused($focused)
-                .onSubmit { submit() }
+            Text(mode == .create ? "잠금 비밀번호 만들기" : "비밀번호 확인").font(.system(size: 12.5, weight: .semibold))
+            ThemedTextField(prompt: "비밀번호", text: $pw, secure: true, autofocus: true, onSubmit: submit)
             if mode == .create {
-                SecureField("비밀번호 확인", text: $confirm)
-                    .onSubmit { submit() }
+                ThemedTextField(prompt: "비밀번호 확인", text: $confirm, secure: true, onSubmit: submit)
                 Text("비밀번호를 잊으면 잠긴 메모는 되살릴 수 없습니다.")
                     .font(.caption).foregroundStyle(.orange)
             }
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("취소") { done() }
-                Button(mode == .create ? "만들고 잠그기" : "잠그기") { submit() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(busy)
-            }
+            PopoverButtons(primary: mode == .create ? "만들고 잠그기" : "잠그기", busy: busy, cancel: done, submit: submit)
+                .padding(.top, 2)
         }
-        .textFieldStyle(.roundedBorder)
         .padding(12)
         .frame(width: 250)
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .themedPopover()
     }
 
     private func submit() {
@@ -683,28 +699,5 @@ private struct NotePasswordPopover: View {
                 self.error = error.localizedDescription
             }
         }
-    }
-}
-
-/// 노트 탭의 작은 강조 알약 버튼 모양 (하위 할 일 개수 알약과 같은 톤).
-private struct NoteChip: View {
-    let icon: String
-    let text: String?
-    @Environment(\.fontScale) private var scale
-    @Environment(\.atmAccent) private var accent
-    @Environment(\.isEnabled) private var enabled
-    @State private var hover = false
-
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: (text == nil ? 12 : 9.5) * scale, weight: .semibold))
-            if let text { Text(text).font(.system(size: 11 * scale, weight: .medium)) }
-        }
-        .foregroundStyle(accent)
-        .padding(.horizontal, text == nil ? 6 : 8).padding(.vertical, 3)
-        .background(Capsule().fill(accent.opacity(hover && enabled ? 0.26 : 0.16)))
-        .opacity(enabled ? 1 : 0.5)
-        .contentShape(Capsule())
-        .onHover { hover = $0 }
     }
 }

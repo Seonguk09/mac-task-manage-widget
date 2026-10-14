@@ -89,15 +89,21 @@ struct TeleportView: View {
                 ProgressView().controlSize(.small)
                 Text(b).font(.system(size: 11 * scale)).foregroundStyle(.secondary)
             } else {
+                // 지금 눌러야 할 버튼 하나만 진하게: 로그아웃이면 "다시 로그인", 아니면 "모두 연결".
                 if !tp.loggedIn {
-                    Button("다시 로그인") { Task { await tp.ensureLoggedIn(force: true) } }
+                    chip("arrow.right.circle.fill", "다시 로그인", .solid) { await tp.ensureLoggedIn(force: true) }
                 }
-                Button("모두 연결") { Task { await tp.connectAll() } }
-                Button("모두 끊기") { Task { await tp.disconnectAll() } }
+                chip("link", "모두 연결", tp.loggedIn ? .solid : .soft) { await tp.connectAll() }
+                chip("xmark", "모두 끊기", .plain) { await tp.disconnectAll() }
             }
         }
         .controlSize(.small)
         .padding(.horizontal, 12).padding(.vertical, 8)
+    }
+
+    private func chip(_ icon: String, _ text: String, _ style: AccentChip.Style, _ action: @escaping () async -> Void) -> some View {
+        Button { Task { await action() } } label: { AccentChip(icon: icon, text: text, style: style) }
+            .buttonStyle(.plain)
     }
 }
 

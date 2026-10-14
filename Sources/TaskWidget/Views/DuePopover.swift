@@ -35,6 +35,7 @@ struct DuePopover: View {
         }
         .padding(12)
         .frame(width: 260)
+        .themedPopover()
     }
 
     private func pick(_ d: Date, dismissAfter: Bool) {

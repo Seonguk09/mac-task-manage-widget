@@ -131,4 +131,11 @@ final class JiraTransitionTests: XCTestCase {
         catch let e as JiraError { XCTAssertEqual(e.userMessage, "권한 없음") }
         catch { XCTFail("\(error)") }
     }
+
+    func testDecodePageWithExpandedTransitions() throws {
+        let json = #"{"issues":[{"key":"NMRS-1","fields":{"summary":"s","status":{"name":"진행 중","statusCategory":{"key":"indeterminate"}},"priority":null,"updated":"2026-10-01T10:00:00.000+0900"},"transitions":[{"id":"31","name":"Done","to":{"name":"완료","statusCategory":{"key":"done"}}}]},{"key":"NMRS-2","fields":{"summary":"t","status":{"name":"할 일","statusCategory":{"key":"new"}},"priority":null,"updated":"2026-10-01T10:00:00.000+0900"}}],"isLast":true}"#
+        let issues = try JiraClient.decodePage(Data(json.utf8)).issues
+        XCTAssertEqual(issues[0].transitions, [JiraTransition(id: "31", name: "Done", toName: "완료", toCategory: "done")])
+        XCTAssertNil(issues[1].transitions, "expand 가 없으면 nil → 팝오버가 따로 받는다")
+    }
 }

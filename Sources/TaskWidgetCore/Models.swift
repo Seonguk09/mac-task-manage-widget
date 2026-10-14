@@ -80,7 +80,7 @@ public struct Todo: Codable, Identifiable, Equatable {
     }
 }
 
-public struct JiraTransition: Equatable, Identifiable {
+public struct JiraTransition: Codable, Equatable, Identifiable {
     public let id: String
     public let name: String
     public let toName: String
@@ -99,9 +99,11 @@ public struct JiraIssue: Codable, Identifiable, Equatable {
     public var priority: String?
     public var updated: Date
     public var fixVersions: [String]
+    /// 목록 조회 때 expand=transitions 로 같이 받은 "지금 바꿀 수 있는 상태". nil 이면 팝오버에서 따로 받는다.
+    public var transitions: [JiraTransition]?
 
     public init(id: String, summary: String, status: String, statusCategory: String,
-                priority: String?, updated: Date, fixVersions: [String] = []) {
+                priority: String?, updated: Date, fixVersions: [String] = [], transitions: [JiraTransition]? = nil) {
         self.id = id
         self.summary = summary
         self.status = status
@@ -109,6 +111,7 @@ public struct JiraIssue: Codable, Identifiable, Equatable {
         self.priority = priority
         self.updated = updated
         self.fixVersions = fixVersions
+        self.transitions = transitions
     }
 }
 

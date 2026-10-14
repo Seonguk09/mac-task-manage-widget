@@ -53,6 +53,8 @@ public struct JiraClient {
             URLQueryItem(name: "jql", value: jql),
             URLQueryItem(name: "fields", value: "summary,status,priority,updated,fixVersions"),
             URLQueryItem(name: "maxResults", value: "100"),
+            // 상태 변경 팝오버가 열 때마다 기다리지 않게, 바꿀 수 있는 상태를 목록과 같이 받는다.
+            URLQueryItem(name: "expand", value: "transitions"),
         ]
         // URLComponents 는 '+' 를 인코딩하지 않아 서버가 공백으로 읽는다. JQL 의 "C++" 같은 값 보호.
         comps.percentEncodedQuery = comps.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
@@ -131,9 +133,11 @@ public struct JiraClient {
     }
 
     static func decodeTransitions(_ data: Data) throws -> [JiraTransition] {
-        try JSONDecoder().decode(TransitionsResponse.self, from: data).transitions.map {
-            JiraTransition(id: $0.id, name: $0.name, toName: $0.to.name, toCategory: $0.to.statusCategory?.key ?? "")
-        }
+        try JSONDecoder().decode(TransitionsResponse.self, from: data).transitions.map(transition)
+    }
+
+    static func transition(_ t: TransitionsResponse.T) -> JiraTransition {
+        JiraTransition(id: t.id, name: t.name, toName: t.to.name, toCategory: t.to.statusCategory?.key ?? "")
     }
 
     static func errorMessage(_ data: Data) -> String {
@@ -144,7 +148,7 @@ public struct JiraClient {
     // MARK: - Decoding
 
     struct SearchResponse: Decodable { let issues: [Issue]; let isLast: Bool? }
-    struct Issue: Decodable { let key: String; let fields: Fields }
+    struct Issue: Decodable { let key: String; let fields: Fields; let transitions: [TransitionsResponse.T]? }
     struct Fields: Decodable {
         let summary: String
         let status: Status
@@ -173,7 +177,8 @@ public struct JiraClient {
                       statusCategory: i.fields.status.statusCategory.key,
                       priority: i.fields.priority?.name,
                       updated: jiraDate.date(from: i.fields.updated) ?? .distantPast,
-                      fixVersions: (i.fields.fixVersions ?? []).map(\.name))
+                      fixVersions: (i.fields.fixVersions ?? []).map(\.name),
+                      transitions: i.transitions.map { $0.map(Self.transition) })
         }
         return Page(issues: issues, truncated: r.isLast == false)
     }
