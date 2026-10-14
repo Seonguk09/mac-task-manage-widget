@@ -290,14 +290,13 @@ public enum TshProfileRepair {
     @discardableResult
     public static func removeEmptyFiles(in keysDir: URL = defaultKeysDir) -> [String] {
         let fm = FileManager.default
-        guard let e = fm.enumerator(at: keysDir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]) else { return [] }
+        guard let e = fm.enumerator(atPath: keysDir.path) else { return [] }
         var removed: [String] = []
-        for case let url as URL in e {
+        for case let rel as String in e {
+            let url = keysDir.appendingPathComponent(rel)
             guard let v = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
                   v.isRegularFile == true, v.fileSize == 0 else { continue }
-            if (try? fm.removeItem(at: url)) != nil {
-                removed.append(String(url.path.dropFirst(keysDir.path.count + 1)))
-            }
+            if (try? fm.removeItem(at: url)) != nil { removed.append(rel) }
         }
         return removed.sorted()
     }
