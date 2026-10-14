@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsObserver: Any?
     private var hotKeyRecObserver: Any?
     private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
+    private var onboardingObserver: Any?
     private var scheduler: Scheduler!
     private var updateTask: Task<Void, Never>?
     private var hotKey: GlobalHotKey!
@@ -52,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // queue: .main 이라 항상 메인 스레드. Sendable 클로저에서 MainActor 프로퍼티 접근 경고를 피한다.
             MainActor.assumeIsolated {
                 self?.panel.applyAppearance()
+                if let w = self?.onboardingWindow, w.isVisible { self?.styleOnboardingWindow(w) }
                 self?.syncHotKey()
             }
         }
@@ -61,6 +64,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] note in
             let pane = note.object as? String
             MainActor.assumeIsolated { self?.showSettingsWindow(pane: pane) }
+        }
+
+        onboardingObserver = NotificationCenter.default.addObserver(
+            forName: .openOnboarding, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.showOnboardingWindow() }
         }
 
         hotKey = GlobalHotKey { [weak self] in self?.hotKeyToggle() }
@@ -99,6 +108,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         panel.makeKeyAndOrderFront(nil)
+
+        // 처음 쓰는 사람에게만 설정 도우미. 이미 쓰던 흔적이 있으면 조용히 끝난 것으로 둔다.
+        let fm = FileManager.default
+        if !Settings.shared.onboardingDone {
+            if Onboarding.shouldShow(done: false, todosExists: fm.fileExists(atPath: Paths.todosFile.path),
+                                     jiraEmail: Settings.shared.jiraEmail,
+                                     teleportExists: fm.fileExists(atPath: Paths.teleportFile.path),
+                                     notesExists: fm.fileExists(atPath: Paths.notesFile.path)) {
+                showOnboardingWindow()
+            } else {
+                Settings.shared.onboardingDone = true
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -249,6 +271,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentViewController = NSHostingController(rootView: SettingsView(initialPane: pane).environmentObject(state))
         // 패널이 '항상 위'면 일반 레벨 창은 그 밑에 깔린다.
         window.level = Settings.shared.alwaysOnTop ? .floating : .normal
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// 패널과 같은 테마 배경·외형을 설정 도우미 창에 입힌다 (FloatingPanel.applyAppearance 와 같은 규칙).
+    private func styleOnboardingWindow(_ w: NSWindow) {
+        let s = Settings.shared
+        w.level = s.alwaysOnTop ? .floating : .normal
+        if let c = s.themeColors, let bg = HexColor.rgb(c.background) {
+            w.backgroundColor = NSColor(srgbRed: bg.r, green: bg.g, blue: bg.b, alpha: 1)
+            w.appearance = NSAppearance(named: c.isDark ? .darkAqua : .aqua)
+        } else {
+            w.backgroundColor = .windowBackgroundColor
+            switch s.theme {
+            case "light": w.appearance = NSAppearance(named: .aqua)
+            case "dark": w.appearance = NSAppearance(named: .darkAqua)
+            default: w.appearance = nil
+            }
+        }
+    }
+
+    /// 설정 도우미. 설정 창처럼 독립 창. 닫기만 하면 done 은 그대로라 다음 실행에 다시 뜬다.
+    private func showOnboardingWindow() {
+        // 이미 진행 중이면 진행 상황을 지우지 말고 앞으로만 가져온다.
+        if let w = onboardingWindow, w.isVisible, w.contentViewController != nil {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let window = onboardingWindow ?? {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
+                             styleMask: [.titled, .closable],
+                             backing: .buffered, defer: false)
+            w.title = "ATM 설정 도우미"
+            w.isReleasedWhenClosed = false
+            w.center()
+            // 닫히면 화면 상태(토큰·비밀번호·OTP 키 입력값)가 메모리에 남지 않게 내용을 뗀다.
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak w] _ in
+                MainActor.assumeIsolated { w?.contentViewController = nil }
+            }
+            onboardingWindow = w
+            return w
+        }()
+        let view = OnboardingView(
+            onClose: { [weak window] in window?.close() },
+            onFinish: { [weak self] in self?.showPanel() }
+        ).environmentObject(state).themedPanel()
+        let host = NSHostingController(rootView: view)
+        host.sizingOptions = []
+        let wasEmpty = window.frame.width < 100
+        window.contentViewController = host
+        // sizingOptions 를 비우면 contentViewController 를 붙일 때 창이 0×0 으로 줄어든다. 크기를 다시 정한다.
+        window.setContentSize(NSSize(width: 560, height: 520))
+        if wasEmpty { window.center() }
+        styleOnboardingWindow(window)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }

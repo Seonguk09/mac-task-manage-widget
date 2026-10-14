@@ -80,6 +80,24 @@ final class TeleportSetupModel: ObservableObject {
         await loadDBs(tsh: tsh)
     }
 
+    /// 화면에 묶어 보여줄 그룹: teleport.json 에 적은 그룹이 있으면 그걸, 없으면 이름의 첫 토큰.
+    func displayGroup(_ name: String) -> String {
+        saved.tunnels.first { $0.name == name }?.group ?? TeleportTunnel.group(forName: name)
+    }
+
+    /// 이미 비밀번호·OTP 키가 저장돼 있는지 (설정 도우미를 다시 열었을 때 다시 입력하지 않게).
+    var hasSavedSecrets: Bool { tp.hasSecrets }
+
+    /// 저장된 정보로 로그인한 뒤 DB 목록을 받는다.
+    func loadWithSaved() async {
+        error = nil
+        guard await tp.ensureLoggedIn(kind: "setup") else {
+            error = "저장된 정보로 로그인하지 못했어요. 비밀번호와 OTP 키를 다시 넣어 주세요."
+            return
+        }
+        await loadDBs()
+    }
+
     // MARK: Step 2
 
     func loadDBs(tsh: String? = nil) async {
@@ -95,7 +113,7 @@ final class TeleportSetupModel: ObservableObject {
         let prev = Dictionary(uniqueKeysWithValues: saved.tunnels.map { ($0.name, $0) })
         entries = dbs.map { db in
             var e = DBEntry(name: db.name, isProd: db.isProd)
-            if !db.isProd, let t = prev[db.name] { e.checked = true; e.dbUser = t.dbUser; e.portText = String(t.port) }
+            if let t = prev[db.name] { e.checked = true; e.dbUser = t.dbUser; e.portText = String(t.port) }
             return e
         }
         step = 2
@@ -111,6 +129,7 @@ final class TeleportSetupModel: ObservableObject {
     }
 
     func save() {
+        error = nil
         var c = saved
         // teleport.json 에 직접 적은 그룹 이름은 유지한다.
         let prevGroup = Dictionary(uniqueKeysWithValues: saved.tunnels.map { ($0.name, $0.groupOverride) })
@@ -122,6 +141,7 @@ final class TeleportSetupModel: ObservableObject {
         do {
             try c.save()
             tp.setupFinished(c)
+            password = ""; otpKey = ""   // 저장 끝났으니 화면 상태에서 비밀을 지운다
         } catch {
             self.error = "저장 실패: \(error.localizedDescription)"
         }

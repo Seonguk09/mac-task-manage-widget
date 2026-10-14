@@ -18,6 +18,9 @@ struct JiraSection: View {
                     Button("설정에서 Jira 토큰 입력") {
                         NotificationCenter.default.post(name: .openSettings, object: nil)
                     }
+                    Button("설정 도우미") {
+                        NotificationCenter.default.post(name: .openOnboarding, object: nil)
+                    }
                     Link("토큰 발급 ↗", destination: Links.jiraToken)
                 }
                 .controlSize(.small)

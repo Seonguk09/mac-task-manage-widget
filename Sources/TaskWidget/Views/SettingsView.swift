@@ -533,6 +533,13 @@ struct SettingsView: View {
                 }
             }
         }
+        Section("설정 도우미") {
+            LabeledContent("처음 설정 다시 하기") {
+                Button("설정 도우미 열기") { NotificationCenter.default.post(name: .openOnboarding, object: nil) }
+            }
+            Text("쓸 기능을 고르고 Jira·노트·Claude·Teleport 를 차례로 설정해요. 지금 값이 채워진 채로 열려요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
         Section("문제 해결") {
             LabeledContent("진단 정보") {
                 if diagBusy { ProgressView().controlSize(.small) }
