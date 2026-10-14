@@ -19,5 +19,5 @@
   "start": 0,
   "limit": 50,
   "size": 2,
-  "_links": { "base": "https://midastech.atlassian.net/wiki", "context": "/wiki" }
+  "_links": { "base": "https://example.atlassian.net/wiki", "context": "/wiki" }
 }

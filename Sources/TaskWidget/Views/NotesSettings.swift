@@ -109,7 +109,7 @@ struct NotesSettingsSections: View {
         }
 
         Section {
-            TextField("주소", text: $confluenceDraft, prompt: Text(Settings.defaultConfluenceBaseURL))
+            TextField("주소", text: $confluenceDraft, prompt: Text("https://your-site.atlassian.net"))
                 .onSubmit { Settings.shared.confluenceBaseURL = confluenceDraft.trimmingCharacters(in: .whitespaces) }
             HStack {
                 Button("연결 확인") {

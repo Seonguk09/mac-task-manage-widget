@@ -45,7 +45,7 @@ public enum SettingsKey {
 public final class Settings {
     public static let shared = Settings()
     public static let defaultJiraBaseURL = ""
-    public static let defaultConfluenceBaseURL = "https://midastech.atlassian.net"
+    public static let defaultConfluenceBaseURL = ""
 
     private let d: UserDefaults
 
