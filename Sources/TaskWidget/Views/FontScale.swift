@@ -13,4 +13,5 @@ extension EnvironmentValues {
 
 extension Notification.Name {
     static let openSettings = Notification.Name("TaskWidget.openSettings")
+    static let openOnboarding = Notification.Name("TaskWidget.openOnboarding")
 }

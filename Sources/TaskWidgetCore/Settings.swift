@@ -40,6 +40,7 @@ public enum SettingsKey {
     public static let notesLinkFilter = "notesLinkFilter"
     public static let confluenceBaseURL = "confluenceBaseURL"
     public static let notesTouchID = "notesTouchID"
+    public static let onboardingDone = "onboardingDone"
 }
 
 public final class Settings {
@@ -190,6 +191,11 @@ public final class Settings {
     public var confluenceBaseURL: String {
         get { string(SettingsKey.confluenceBaseURL, Self.defaultConfluenceBaseURL) }
         set { d.set(newValue, forKey: SettingsKey.confluenceBaseURL) }
+    }
+    /// 설정 도우미를 끝냈거나 건너뛴 적이 있는지 (기존 사용자는 첫 실행 때 조용히 true).
+    public var onboardingDone: Bool {
+        get { bool(SettingsKey.onboardingDone, false) }
+        set { d.set(newValue, forKey: SettingsKey.onboardingDone) }
     }
     public var enabledTabs: String {
         get { string(SettingsKey.enabledTabs, "tasks,summary") }
