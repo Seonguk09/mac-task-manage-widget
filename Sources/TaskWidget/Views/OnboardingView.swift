@@ -615,6 +615,14 @@ private struct TeleportOnboardingBody: View {
                 }
                 Text("Google OTP 등록할 때 받은 긴 영문 키예요 (QR 아래 '키 직접 입력'). QR 이미지가 있으면 [QR 읽기]")
                     .font(.system(size: 10.5 * scale)).foregroundStyle(.secondary)
+                // 넣은 키가 맞는지 OTP 앱 숫자와 바로 비교할 수 있게 (Teleport 설정 화면과 같다)
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    if let t = TOTP(input: m.otpKey) {
+                        let c = t.code(at: ctx.date)
+                        Text("현재 코드 \(c.prefix(3)) \(c.suffix(3)) · OTP 앱 숫자와 같으면 맞게 들어간 거예요")
+                            .font(.system(size: 11 * scale, weight: .medium)).monospacedDigit().foregroundStyle(.green)
+                    }
+                }
                 Link("OTP 키를 모르면: OTP 키 구하는 법 ↗", destination: Links.otpKeyGuide).font(.system(size: 11 * scale))
             }
             Text("입력한 값은 2단계에서 고른 곳에만 저장돼요. 매번 OTP 를 칠 필요 없이 앱이 대신 로그인해요.")
