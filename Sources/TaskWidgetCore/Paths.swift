@@ -6,6 +6,7 @@ public enum Paths {
             .appendingPathComponent("TaskWidget", isDirectory: true)
     }
     public static var todosFile: URL { dataDir.appendingPathComponent("todos.json") }
+    public static var notesFile: URL { dataDir.appendingPathComponent("notes.json") }
     public static var activityFile: URL { dataDir.appendingPathComponent("activity.jsonl") }
     public static var worklogDir: URL { dataDir.appendingPathComponent("worklog", isDirectory: true) }
     public static var summariesDir: URL { dataDir.appendingPathComponent("summaries", isDirectory: true) }

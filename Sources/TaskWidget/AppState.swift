@@ -28,6 +28,7 @@ final class AppState: ObservableObject {
     let todoStore: TodoStore
     let tagStore = TagStore()
     let teleport = TeleportManager()
+    let notes = NotesModel()
 
     /// Jira 탭을 안 열어도 18시 자동 요약이 키를 알도록 마지막으로 본 프로젝트 접두사를 저장해 둔다.
     nonisolated static let jiraPrefixesKey = "jiraProjectPrefixes"
@@ -47,6 +48,7 @@ final class AppState: ObservableObject {
         self.tagConfig = tagStore.load()
         enforceSingleSelect()
         consumeUpdateFailure()
+        NotesModel.introduceTabIfNeeded()
     }
 
     // MARK: - Update
@@ -396,6 +398,43 @@ final class AppState: ObservableObject {
             if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
             jiraError = error.localizedDescription
             DiagLog.append("jira refresh error: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Confluence (노트 탭)
+
+    /// 토큰을 보내도 되는 주소만: https + 호스트. 입력 도중의 반쪽 주소로 토큰이 나가지 않게 한다.
+    static func confluenceURL(_ raw: String) -> URL? {
+        guard let u = URL(string: raw.trimmingCharacters(in: .whitespaces)),
+              u.scheme?.lowercased() == "https", let h = u.host, h.contains(".") else { return nil }
+        return u
+    }
+
+    /// Jira 와 같은 이메일·토큰을 쓴다. 주소가 비어 있으면 아무것도 하지 않는다.
+    func refreshConfluence() async {
+        let s = Settings.shared
+        guard !s.confluenceBaseURL.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard let url = Self.confluenceURL(s.confluenceBaseURL) else {
+            notes.setConfluenceError("Confluence 주소는 https:// 로 시작해야 해요"); return
+        }
+        guard !s.jiraEmail.isEmpty, let token = await jiraToken(for: s.jiraEmail) else {
+            notes.setConfluenceError("Jira 토큰이 필요해요"); return
+        }
+        await notes.refreshConfluence(base: url, email: s.jiraEmail, token: token)
+        if notes.starredError == ConfluenceError.unauthorized.userMessage { cachedToken = nil }
+    }
+
+    /// 설정 > 노트의 "연결 확인". 사람이 읽을 결과 문자열.
+    func testConfluence(baseURL: String) async -> String {
+        let s = Settings.shared
+        guard let url = Self.confluenceURL(baseURL) else { return "https:// 로 시작하는 주소를 입력하세요" }
+        guard !s.jiraEmail.isEmpty, let token = await jiraToken(for: s.jiraEmail) else { return "Jira 이메일·토큰을 먼저 저장하세요" }
+        do {
+            let n = try await ConfluenceClient.fetchStarred(baseURL: url, email: s.jiraEmail, token: token).count
+            return "OK: \(n)개"
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { return "" }
+            return (error as? ConfluenceError)?.userMessage ?? error.localizedDescription
         }
     }
 

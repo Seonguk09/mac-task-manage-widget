@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "id": "1001",
+      "type": "page",
+      "title": "배포 가이드",
+      "space": { "key": "DEV", "name": "개발" },
+      "version": { "when": "2026-10-01T09:30:00.000+09:00" },
+      "_links": { "webui": "/spaces/DEV/pages/1001/Deploy+Guide" }
+    },
+    {
+      "id": "1002",
+      "type": "page",
+      "title": "온보딩",
+      "space": { "key": "HR" },
+      "_links": { "webui": "/spaces/HR/pages/1002/Onboarding" }
+    }
+  ],
+  "start": 0,
+  "limit": 50,
+  "size": 2,
+  "_links": { "base": "https://example.atlassian.net/wiki", "context": "/wiki" }
+}

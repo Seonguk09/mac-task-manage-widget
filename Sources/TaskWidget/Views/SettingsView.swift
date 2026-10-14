@@ -3,7 +3,7 @@ import ServiceManagement
 import TaskWidgetCore
 
 private enum Pane: String, CaseIterable, Identifiable {
-    case appearance, window, tags, jira, summary, claude, teleport, about
+    case appearance, window, tags, jira, notes, summary, claude, teleport, about
     var id: Self { self }
 
     var title: String {
@@ -12,6 +12,7 @@ private enum Pane: String, CaseIterable, Identifiable {
         case .window: return "창 · 일반"
         case .tags: return "태그"
         case .jira: return "Jira"
+        case .notes: return "노트"
         case .summary: return "요약"
         case .claude: return "Claude 연동"
         case .teleport: return "Teleport"
@@ -25,6 +26,7 @@ private enum Pane: String, CaseIterable, Identifiable {
         case .window: return "macwindow"
         case .tags: return "tag"
         case .jira: return "ticket"
+        case .notes: return "note.text"
         case .summary: return "doc.text"
         case .claude: return "sparkles"
         case .teleport: return "network"
@@ -133,6 +135,7 @@ struct SettingsView: View {
         case .window: windowPane
         case .tags: tagsPane
         case .jira: jiraPane
+        case .notes: NotesSettingsSections(notes: state.notes)
         case .summary: summaryPane
         case .claude: claudePane
         case .teleport: teleportPane
@@ -219,7 +222,7 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .disabled(secretBusy)
             if secretStorage == "file" {
-                Text("Jira 토큰과 Teleport 비밀번호·OTP 키가 ~/Library/Application Support/TaskWidget/secrets.json 에 암호화 없이 저장돼요 (내 계정만 읽기 가능). 키체인 허용 창이 뜨지 않아요.")
+                Text("Jira 토큰, Teleport 비밀번호·OTP 키, 노트 Touch ID 열쇠가 ~/Library/Application Support/TaskWidget/secrets.json 에 암호화 없이 저장돼요 (내 계정만 읽기 가능). 키체인 허용 창이 뜨지 않아요.")
                     .font(.caption).foregroundStyle(.orange)
             } else {
                 Text("업데이트·재설치 후 macOS가 한 번 허용을 물어요.")

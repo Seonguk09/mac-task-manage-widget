@@ -34,11 +34,18 @@ public enum SettingsKey {
     public static let globalHotKeyEnabled = "globalHotKeyEnabled"
     public static let globalHotKey = "globalHotKey"
     public static let secretStorage = "secretStorage"
+    public static let notesTabIntroduced = "notesTabIntroduced"
+    public static let notesMemoCollapsed = "notesMemoCollapsed"
+    public static let notesLinkCollapsed = "notesLinkCollapsed"
+    public static let notesLinkFilter = "notesLinkFilter"
+    public static let confluenceBaseURL = "confluenceBaseURL"
+    public static let notesTouchID = "notesTouchID"
 }
 
 public final class Settings {
     public static let shared = Settings()
     public static let defaultJiraBaseURL = ""
+    public static let defaultConfluenceBaseURL = ""
 
     private let d: UserDefaults
 
@@ -178,6 +185,11 @@ public final class Settings {
     public var secretStorage: String {
         get { string(SettingsKey.secretStorage, "keychain") }
         set { d.set(newValue, forKey: SettingsKey.secretStorage) }
+    }
+    /// 비면 노트 탭의 Confluence 부분을 숨긴다.
+    public var confluenceBaseURL: String {
+        get { string(SettingsKey.confluenceBaseURL, Self.defaultConfluenceBaseURL) }
+        set { d.set(newValue, forKey: SettingsKey.confluenceBaseURL) }
     }
     public var enabledTabs: String {
         get { string(SettingsKey.enabledTabs, "tasks,summary") }

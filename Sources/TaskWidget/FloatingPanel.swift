@@ -118,6 +118,8 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         hovering = false
         applyAppearance()
         super.orderOut(sender)
+        // 잠긴 메모를 다시 잠글 수 있게 알린다.
+        NotificationCenter.default.post(name: .panelDidHide, object: nil)
     }
 
     /// 닫기 버튼 = 숨기기. 앱은 메뉴바에 계속 산다.
