@@ -340,11 +340,32 @@ final class NotesModel: ObservableObject {
         let link = SavedLink(title: placeholder, url: url.absoluteString)
         data.links.append(link)
         persist()
+        fetchTitle(link.id, url, placeholder: placeholder)
+        return true
+    }
+
+    /// 페이지 제목을 받아 이름이 아직 placeholder 면 바꾼다 (그 사이 사용자가 이름을 바꿨으면 건드리지 않는다).
+    private func fetchTitle(_ id: UUID, _ url: URL, placeholder: String) {
         Task { [weak self] in
             guard let title = await LinkTitle.fetch(url) else { return }
-            // 그 사이 사용자가 이름을 바꿨으면 건드리지 않는다.
-            guard let self, let cur = self.data.links.first(where: { $0.id == link.id }), cur.title == placeholder else { return }
-            self.renameLink(link.id, title)
+            guard let self, let cur = self.data.links.first(where: { $0.id == id }), cur.title == placeholder else { return }
+            self.renameLink(id, title)
+        }
+    }
+
+    /// 수정 창: 이름과 주소를 함께 바꾼다. 주소로 볼 수 없으면 false. 이름을 비우면 새 주소의 페이지 제목을 받아 온다.
+    @discardableResult
+    func updateLink(_ id: UUID, title: String, url input: String) -> Bool {
+        guard let url = LinkTitle.normalize(input), let i = data.links.firstIndex(where: { $0.id == id }) else { return false }
+        data.links[i].url = url.absoluteString
+        if let t = Todo.normalizedTitle(title) {
+            data.links[i].title = t
+            persist()
+        } else {
+            let placeholder = url.host ?? url.absoluteString
+            data.links[i].title = placeholder
+            persist()
+            fetchTitle(id, url, placeholder: placeholder)
         }
         return true
     }
